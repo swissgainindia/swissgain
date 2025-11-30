@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import connectDB from "./../client/src/lib/mongodb";
+import connectDB from "./../lib/mongodb";
 import Product from "../server/models/Product";
 
 export default async function handler(
