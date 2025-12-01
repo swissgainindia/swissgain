@@ -213,7 +213,7 @@ export default function AdminPanel() {
             </Button>
           </form>
           <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Super Admin: <code>{SUPER_USERNAME} / {SUPER_PASSWORD}</code></p>
+            {/* <p>Super Admin: <code>{SUPER_USERNAME} / {SUPER_PASSWORD}</code></p> */}
           </div>
         </div>
       </div>

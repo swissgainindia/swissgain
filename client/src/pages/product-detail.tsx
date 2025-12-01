@@ -1,4 +1,4 @@
-// Updated ProductDetail Component with Fixed Commission Handling
+// Updated ProductDetail Component with Fixed Commission Handling and Razorpay
 import { useState, useEffect } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,23 @@ const initializeFirebase = () => {
 };
 const firebaseDatabase = initializeFirebase();
 
+// Razorpay Configuration
+const RAZORPAY_CONFIG = {
+  key_id: "rzp_live_RjxoVsUGVyJUhQ",
+  key_secret: "shF22XqtflD64nRd2GdzCYoT",
+};
+
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 // Commission rates (total ~24.4%)
 const commissionRates = [0.10, 0.05, 0.025, 0.02, 0.015, 0.01, 0.008, 0.006, 0.005, 0.005];
 
@@ -81,6 +98,15 @@ interface OrderData {
   productBrand?: string;
   productRating?: number;
   productReviews?: number;
+  razorpayPayment?: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+    amount: number;
+    currency: string;
+    status: string;
+    paid_at: string;
+  };
 }
 
 // Customer ID Helpers
@@ -169,7 +195,7 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
     const snap = await get(walletRef);
     const currentBalance = snap.exists() ? snap.val().balance : 0;
    
-    const newBalance = currentBalance + amount; // ✅ FIXED: Removed extra space
+    const newBalance = currentBalance + amount;
 
     await set(walletRef, {
       balance: newBalance,
@@ -187,7 +213,7 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
       status: 'completed'
     });
 
-    console.log(`💰 Wallet updated for ${affiliateId}: +₹${amount} = ₹${newBalance}`); // ✅ FIXED: Removed extra space
+    console.log(`💰 Wallet updated for ${affiliateId}: +₹${amount} = ₹${newBalance}`);
   } catch (error) {
     console.error('Error adding to wallet:', error);
     throw error;
@@ -378,14 +404,21 @@ interface CheckoutModalProps {
 function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
   const totalAmount = product.price * quantity;
 
+  // Load Razorpay script when modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+      
+      // Load Razorpay script
+      loadRazorpayScript().then((loaded) => {
+        setRazorpayLoaded(!!loaded);
+      });
     }
   }, [isOpen]);
 
@@ -396,42 +429,129 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
-      toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
-      return;
+  // Initialize Razorpay Payment
+  const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) => {
+    if (!razorpayLoaded) {
+      toast({
+        title: 'Payment Error',
+        description: 'Payment system is loading. Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return false;
     }
 
-    setLoading(true);
+    if (!window.Razorpay) {
+      toast({
+        title: 'Payment Error',
+        description: 'Razorpay not available. Please refresh the page.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    const options = {
+      key: RAZORPAY_CONFIG.key_id,
+      amount: totalAmount * 100, // Convert to paise
+      currency: 'INR',
+      name: 'SwissGain',
+      description: `Purchase: ${product.name}`,
+      image: '/logo.png',
+      handler: async function (response: any) {
+        console.log('Payment successful:', response);
+        await completeOrderAfterPayment(response, orderData, orderId);
+      },
+      prefill: {
+        name: formData.name,
+        email: formData.email,
+        contact: formData.phone,
+      },
+      notes: {
+        address: 'SwissGain Product Purchase',
+        user_id: customerId,
+        order_id: orderId,
+        product: product.name
+      },
+      theme: {
+        color: '#b45309',
+      },
+      modal: {
+        ondismiss: function() {
+          toast({
+            title: 'Payment Cancelled',
+            description: 'You cancelled the payment process.',
+            variant: 'default',
+          });
+        }
+      }
+    };
+
     try {
-      const purchaseCustomerId = generatePurchaseCustomerId();
-      const orderData: OrderData = {
-        productId: product._id,
-        ...(affiliateId && { affiliateId }),
-        customerId: purchaseCustomerId,
-        originalCustomerId: customerId,
-        productName: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice,
-        quantity,
-        totalAmount,
-        customerInfo: formData,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        images: product.images,
-        category: product.category,
-        discount: product.discount,
-        productDescription: product.description,
-        productFeatures: product.features,
-        productBrand: product.brand || 'SwissGain',
-        productRating: product.rating,
-        productReviews: product.reviews
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.open();
+      return true;
+    } catch (error) {
+      console.error('Razorpay initialization error:', error);
+      toast({
+        title: 'Payment Error',
+        description: 'Failed to initialize payment. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  // Complete order after successful payment
+  const completeOrderAfterPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
+    try {
+      // Update order with payment details
+      const updatedOrderData: OrderData = {
+        ...orderData,
+        status: 'confirmed',
+        razorpayPayment: {
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_signature: paymentResponse.razorpay_signature,
+          amount: totalAmount,
+          currency: 'INR',
+          status: 'completed',
+          paid_at: new Date().toISOString(),
+        }
       };
 
-      const orderId = await saveOrderToFirebase(orderData);
-      console.log(`✅ Order saved: ${orderId}`);
+      // Update order in Firebase
+      await update(ref(firebaseDatabase, `orders/${orderId}`), updatedOrderData);
+      console.log(`✅ Payment confirmed for order: ${orderId}`);
 
+      // Process commissions
+      await processCommissions(orderId, totalAmount, formData, product);
+
+      toast({
+        title: "Payment Successful! 🎉",
+        description: `Your order has been confirmed. Order ID: ${orderId.slice(0, 8)}...`,
+      });
+
+      setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        onClose();
+        // Optionally redirect to order confirmation page
+        // window.location.href = `/order-confirmation/${orderId}`;
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('❌ Order completion error:', error);
+      toast({
+        title: "Payment Error",
+        description: "Payment was successful but order processing failed. Please contact support.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Process commissions after payment
+  const processCommissions = async (orderId: string, totalAmount: number, formData: any, product: any) => {
+    try {
       // FIXED: COMBINED 10% + ₹100 Bonus for Direct Referral Link
       if (affiliateId && uid !== affiliateId) {
         const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
@@ -455,14 +575,56 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
           console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
         }
       }
+    } catch (error) {
+      console.error('❌ Commission processing error:', error);
+      // Don't throw error here - payment was successful even if commissions fail
+    }
+  };
 
-      toast({
-        title: "Order Placed Successfully!",
-        description: `Order ID: ${orderId.slice(0, 8)}... Commissions processed.`,
-      });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
+      toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
+      return;
+    }
 
-      setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
-      onClose();
+    setLoading(true);
+    try {
+      const purchaseCustomerId = generatePurchaseCustomerId();
+      const orderData: OrderData = {
+        productId: product._id,
+        ...(affiliateId && { affiliateId }),
+        customerId: purchaseCustomerId,
+        originalCustomerId: customerId,
+        productName: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        quantity,
+        totalAmount,
+        customerInfo: formData,
+        status: 'pending', // Will be updated to 'confirmed' after payment
+        createdAt: new Date().toISOString(),
+        images: product.images,
+        category: product.category,
+        discount: product.discount,
+        productDescription: product.description,
+        productFeatures: product.features,
+        productBrand: product.brand || 'SwissGain',
+        productRating: product.rating,
+        productReviews: product.reviews
+      };
+
+      const orderId = await saveOrderToFirebase(orderData);
+      console.log(`✅ Order saved: ${orderId}`);
+
+      // Initialize Razorpay payment
+      const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
+      
+      if (!paymentInitiated) {
+        setLoading(false);
+      }
+      // Note: Don't close modal here - wait for payment completion
+
     } catch (error: any) {
       console.error('❌ Order placement error:', error);
       toast({
@@ -470,7 +632,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         description: error.message || "Failed to place order.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -542,13 +703,15 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               <div className="space-y-2"><Label>State *</Label><Input name="state" value={formData.state} onChange={handleInputChange} required /></div>
             </div>
             <div className="space-y-2"><Label>PIN Code *</Label><Input name="pincode" value={formData.pincode} onChange={handleInputChange} required /></div>
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground py-3" disabled={loading}>
-              {loading ? "Processing..." : `Pay ₹${totalAmount.toLocaleString()}`}
+            <Button type="submit" className="w-full gradient-primary text-primary-foreground py-3" disabled={loading || !razorpayLoaded}>
+              {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : `Pay ₹${totalAmount.toLocaleString()}`}
             </Button>
           </form>
 
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-center text-xs text-gray-600">
-            Your information is secure and encrypted.
+          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+            <p className="text-xs text-green-700">
+              <strong>Secure Payment:</strong> Powered by Razorpay. Your payment details are safe and encrypted.
+            </p>
           </div>
         </div>
       </DialogContent>
@@ -640,7 +803,6 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
-          {/* ... (rest of the product display JSX remains the same) ... */}
           <div className="space-y-4">
             <div className="relative">
               <img src={product.images[selectedImageIndex] || FALLBACK_IMAGE} alt={product.name} className="rounded-xl shadow-lg w-full h-96 object-cover" onError={(e) => e.currentTarget.src = FALLBACK_IMAGE} />
@@ -764,4 +926,11 @@ export default function ProductDetail() {
       />
     </div>
   );
+}
+
+// Add Razorpay type declaration
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
 }

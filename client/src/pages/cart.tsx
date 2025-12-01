@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -38,13 +38,32 @@ const generateUniqueCustomerId = () => {
 
 const getOrCreateCustomerId = () => generateUniqueCustomerId();
 
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function Cart() {
   const { data, updateData } = useLocalStorage();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   
   const affiliateId = getAffiliateIdFromUrl();
   const uid = getCookie('swissgain_uid') || undefined;
   const customerId = uid || getOrCreateCustomerId();
+
+  // Load Razorpay script on component mount
+  useEffect(() => {
+    loadRazorpayScript().then((loaded) => {
+      setRazorpayLoaded(!!loaded);
+    });
+  }, []);
 
   const handleRemoveItem = (productId: string) => {
     updateData(removeFromCart.bind(null, productId));
@@ -73,6 +92,16 @@ export default function Cart() {
 
   const getTotalItems = () => {
     return data.cart.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  // Check if Razorpay is ready before allowing checkout
+  const handleCheckoutClick = () => {
+    if (!razorpayLoaded) {
+      // Show loading message
+      alert('Payment system is loading. Please wait a moment...');
+      return;
+    }
+    setIsCheckoutOpen(true);
   };
 
   if (data.cart.length === 0) {
@@ -185,10 +214,11 @@ export default function Cart() {
 
                 <div className="space-y-3">
                   <Button
-                    onClick={() => setIsCheckoutOpen(true)}
+                    onClick={handleCheckoutClick}
                     className="w-full gradient-gold text-accent-foreground"
+                    disabled={!razorpayLoaded}
                   >
-                    Proceed to Checkout
+                    {razorpayLoaded ? 'Proceed to Checkout' : 'Loading Payment...'}
                   </Button>
                   <Link href="/products">
                     <Button variant="outline" className="w-full">
@@ -217,6 +247,7 @@ export default function Cart() {
         customerId={customerId}
         uid={uid}
         onOrderSuccess={handleOrderSuccess}
+        razorpayLoaded={razorpayLoaded}
       />
     </div>
   );
