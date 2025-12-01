@@ -1,4 +1,4 @@
-// Updated ProductDetail Component with Fixed Commission Handling
+// Updated ProductDetail Component with Razorpay Integration
 import { useState, useEffect } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '@/components/product-card';
-import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft } from 'lucide-react';
+import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
@@ -26,6 +27,27 @@ const firebaseConfig = {
   messagingSenderId: "1062016445247",
   appId: "1:1062016445247:web:bf559ce1ed7f17e2ca418a",
   measurementId: "G-VTKPWVEY0S"
+};
+
+// Razorpay Configuration
+const RAZORPAY_CONFIG = {
+  key_id: "rzp_live_RjxoVsUGVyJUhQ",
+  key_secret: "shF22XqtflD64nRd2GdzCYoT",
+};
+
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => {
+      resolve(true);
+    };
+    script.onerror = () => {
+      resolve(false);
+    };
+    document.body.appendChild(script);
+  });
 };
 
 // Initialize Firebase only once
@@ -81,6 +103,9 @@ interface OrderData {
   productBrand?: string;
   productRating?: number;
   productReviews?: number;
+  paymentMethod?: string;
+  paymentId?: string;
+  paymentStatus?: 'pending' | 'completed' | 'failed';
 }
 
 // Customer ID Helpers
@@ -139,6 +164,24 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
     return newOrderRef.key!;
   } catch (error) {
     console.error('Error saving order:', error);
+    throw error;
+  }
+};
+
+// Update Order Payment Status
+const updateOrderPaymentStatus = async (orderId: string, paymentId: string, paymentStatus: string, razorpayOrderId?: string): Promise<void> => {
+  try {
+    const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+    await update(orderRef, {
+      paymentId,
+      paymentStatus,
+      razorpayOrderId,
+      paymentTimestamp: new Date().toISOString(),
+      ...(paymentStatus === 'completed' && { status: 'confirmed' })
+    });
+    console.log(`✅ Order ${orderId} payment status updated to ${paymentStatus}`);
+  } catch (error) {
+    console.error('Error updating payment status:', error);
     throw error;
   }
 };
@@ -364,6 +407,38 @@ const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: s
   }
 };
 
+// Create Razorpay Order
+const createRazorpayOrder = async (amount: number, customerName: string, customerEmail: string, customerPhone: string) => {
+  try {
+    // In production, this should be done on your backend
+    // For demo, we'll create order client-side (not recommended for production)
+    
+    // Note: In production, make a server-side API call to create order
+    const orderData = {
+      amount: amount * 100, // Razorpay expects amount in paise
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+      notes: {
+        customerName,
+        customerEmail,
+        customerPhone
+      }
+    };
+
+    // This is a client-side simulation. In production, call your backend API
+    console.log('Creating Razorpay order for amount:', amount);
+    
+    return {
+      id: `order_${Date.now()}`,
+      amount: orderData.amount,
+      currency: orderData.currency
+    };
+  } catch (error) {
+    console.error('Error creating Razorpay order:', error);
+    throw error;
+  }
+};
+
 // Checkout Modal
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -378,14 +453,22 @@ interface CheckoutModalProps {
 function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
+  const [orderId, setOrderId] = useState<string | null>(null);
   const totalAmount = product.price * quantity;
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+      setOrderId(null);
+      setPaymentMethod('razorpay');
+      
+      // Load Razorpay script when modal opens
+      loadRazorpayScript();
     }
   }, [isOpen]);
 
@@ -396,8 +479,113 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
+  // Initialize Razorpay Payment
+  const initializeRazorpayPayment = async (orderData: OrderData, firebaseOrderId: string) => {
+    try {
+      const razorpayOrder = await createRazorpayOrder(
+        totalAmount,
+        formData.name,
+        formData.email,
+        formData.phone
+      );
+
+      const options = {
+        key: RAZORPAY_CONFIG.key_id,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: "SwissGain",
+        description: `Purchase: ${product.name} (${quantity} items)`,
+        order_id: razorpayOrder.id,
+        handler: async (response: any) => {
+          console.log('Razorpay payment successful:', response);
+          
+          // Update order with payment success
+          await updateOrderPaymentStatus(
+            firebaseOrderId,
+            response.razorpay_payment_id,
+            'completed',
+            response.razorpay_order_id
+          );
+
+          // Process commissions
+          await processCommissionsAfterPayment(firebaseOrderId, orderData);
+
+          toast({
+            title: "Payment Successful!",
+            description: `Your order has been confirmed. Order ID: ${firebaseOrderId.slice(0, 8)}...`,
+          });
+
+          setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+          onClose();
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone
+        },
+        notes: {
+          orderId: firebaseOrderId,
+          product: product.name,
+          affiliateId: affiliateId || 'none'
+        },
+        theme: {
+          color: "#F59E0B"
+        },
+        modal: {
+          ondismiss: () => {
+            console.log('Payment modal dismissed');
+            toast({
+              title: "Payment Cancelled",
+              description: "You cancelled the payment process.",
+              variant: "destructive",
+            });
+          }
+        }
+      };
+
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error('Razorpay initialization error:', error);
+      throw error;
+    }
+  };
+
+  // Process commissions after successful payment
+  const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
+    try {
+      // FIXED: COMBINED 10% + ₹100 Bonus for Direct Referral Link
+      if (affiliateId && uid !== affiliateId) {
+        const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
+        if (referrerSnap.exists()) {
+          console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
+          await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
+        } else {
+          console.log(`❌ Affiliate ${affiliateId} not found in database`);
+        }
+      } else {
+        console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
+      }
+
+      // FIXED: Multi-level commissions (only if buyer is affiliate)
+      if (uid) {
+        const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
+        if (affSnap.exists() && affSnap.val().isAffiliate) {
+          console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
+          await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
+        } else {
+          console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
+        }
+      }
+    } catch (error) {
+      console.error('Commission processing error:', error);
+      // Don't throw error here - payment was successful even if commission failed
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
       toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
       return;
@@ -426,43 +614,28 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         productFeatures: product.features,
         productBrand: product.brand || 'SwissGain',
         productRating: product.rating,
-        productReviews: product.reviews
+        productReviews: product.reviews,
+        paymentMethod,
+        paymentStatus: 'pending'
       };
 
-      const orderId = await saveOrderToFirebase(orderData);
-      console.log(`✅ Order saved: ${orderId}`);
+      const firebaseOrderId = await saveOrderToFirebase(orderData);
+      setOrderId(firebaseOrderId);
+      console.log(`✅ Order saved: ${firebaseOrderId}`);
 
-      // FIXED: COMBINED 10% + ₹100 Bonus for Direct Referral Link
-      if (affiliateId && uid !== affiliateId) {
-        const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
-        if (referrerSnap.exists()) {
-          console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
-          await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
-        } else {
-          console.log(`❌ Affiliate ${affiliateId} not found in database`);
-        }
+      if (paymentMethod === 'razorpay') {
+        setPaymentLoading(true);
+        await initializeRazorpayPayment(orderData, firebaseOrderId);
       } else {
-        console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
+        // For other payment methods (COD, etc.)
+        toast({
+          title: "Order Placed Successfully!",
+          description: `Order ID: ${firebaseOrderId.slice(0, 8)}... We'll contact you for payment confirmation.`,
+        });
+
+        setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+        onClose();
       }
-
-      // FIXED: Multi-level commissions (only if buyer is affiliate)
-      if (uid) {
-        const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
-        if (affSnap.exists() && affSnap.val().isAffiliate) {
-          console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
-          await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
-        } else {
-          console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
-        }
-      }
-
-      toast({
-        title: "Order Placed Successfully!",
-        description: `Order ID: ${orderId.slice(0, 8)}... Commissions processed.`,
-      });
-
-      setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
-      onClose();
     } catch (error: any) {
       console.error('❌ Order placement error:', error);
       toast({
@@ -472,6 +645,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
     } finally {
       setLoading(false);
+      setPaymentLoading(false);
     }
   };
 
@@ -533,22 +707,89 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2"><Label>Full Name *</Label><Input name="name" value={formData.name} onChange={handleInputChange} required /></div>
-            <div className="space-y-2"><Label>Email *</Label><Input name="email" type="email" value={formData.email} onChange={handleInputChange} required /></div>
-            <div className="space-y-2"><Label>Phone *</Label><Input name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required /></div>
-            <div className="space-y-2"><Label>Address *</Label><Input name="address" value={formData.address} onChange={handleInputChange} required /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>City *</Label><Input name="city" value={formData.city} onChange={handleInputChange} required /></div>
-              <div className="space-y-2"><Label>State *</Label><Input name="state" value={formData.state} onChange={handleInputChange} required /></div>
+            <div className="space-y-2">
+              <Label>Full Name *</Label>
+              <Input name="name" value={formData.name} onChange={handleInputChange} required />
             </div>
-            <div className="space-y-2"><Label>PIN Code *</Label><Input name="pincode" value={formData.pincode} onChange={handleInputChange} required /></div>
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground py-3" disabled={loading}>
-              {loading ? "Processing..." : `Pay ₹${totalAmount.toLocaleString()}`}
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input name="email" type="email" value={formData.email} onChange={handleInputChange} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone *</Label>
+              <Input name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Address *</Label>
+              <Input name="address" value={formData.address} onChange={handleInputChange} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>City *</Label>
+                <Input name="city" value={formData.city} onChange={handleInputChange} required />
+              </div>
+              <div className="space-y-2">
+                <Label>State *</Label>
+                <Input name="state" value={formData.state} onChange={handleInputChange} required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>PIN Code *</Label>
+              <Input name="pincode" value={formData.pincode} onChange={handleInputChange} required />
+            </div>
+
+            <div className="space-y-4">
+              <Label>Payment Method</Label>
+              <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="razorpay" id="razorpay" />
+                  <Label htmlFor="razorpay" className="flex items-center space-x-2 cursor-pointer">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Credit/Debit Card, UPI, NetBanking</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="cod" id="cod" />
+                  <Label htmlFor="cod" className="flex items-center space-x-2 cursor-pointer">
+                    <Wallet className="h-4 w-4" />
+                    <span>Cash on Delivery (Limited Availability)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full gradient-primary text-primary-foreground py-3"
+              disabled={loading || paymentLoading}
+            >
+              {paymentLoading ? (
+                "Redirecting to Payment..."
+              ) : loading ? (
+                "Processing..."
+              ) : paymentMethod === 'cod' ? (
+                `Place COD Order - ₹${totalAmount.toLocaleString()}`
+              ) : (
+                `Pay Now - ₹${totalAmount.toLocaleString()}`
+              )}
             </Button>
           </form>
 
+          {paymentMethod === 'razorpay' && (
+            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-center">
+              <p className="text-xs text-yellow-700">
+                You will be redirected to Razorpay's secure payment gateway to complete your transaction.
+              </p>
+              <div className="flex justify-center items-center space-x-4 mt-2">
+                <img src="https://razorpay.com/assets/razorpay-logo.svg" alt="Razorpay" className="h-6" />
+                <img src="https://razorpay.com/assets/pci-dss-compliant.svg" alt="PCI DSS Compliant" className="h-6" />
+              </div>
+            </div>
+          )}
+
           <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-center text-xs text-gray-600">
-            Your information is secure and encrypted.
+            <p>Your information is secure and encrypted.</p>
+            <p className="mt-1">All transactions are protected by 256-bit SSL encryption.</p>
           </div>
         </div>
       </DialogContent>
@@ -557,7 +798,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 }
 
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
-const BASE_IMAGE_URL = 'https://swissgainindia.com/';
+const BASE_IMAGE_URL = 'https://swissgainindia.com';
 
 export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
@@ -640,7 +881,6 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
-          {/* ... (rest of the product display JSX remains the same) ... */}
           <div className="space-y-4">
             <div className="relative">
               <img src={product.images[selectedImageIndex] || FALLBACK_IMAGE} alt={product.name} className="rounded-xl shadow-lg w-full h-96 object-cover" onError={(e) => e.currentTarget.src = FALLBACK_IMAGE} />
