@@ -11,7 +11,7 @@ import axios from 'axios';
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
 
 // Base URL for images (replace with your backend's base URL)
-const BASE_IMAGE_URL = 'http://localhost:5000'; // Update with your actual backend URL
+const BASE_IMAGE_URL = 'https://swissgainindia.com'; // Update with your actual backend URL
 
 // Define product type based on API response (aligned with ProductForm and AdminProducts)
 interface Product {

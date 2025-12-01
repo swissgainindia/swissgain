@@ -848,7 +848,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 }
 
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
-const BASE_IMAGE_URL = 'http://localhost:5000';
+const BASE_IMAGE_URL = 'https://swissgainindia.com';
 
 export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
