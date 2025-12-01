@@ -182,7 +182,7 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 999
+        purchaseAmount: 1
       };
      
       await set(newRef, referralData);
