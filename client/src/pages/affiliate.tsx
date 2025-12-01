@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth, findUserByCredentials } from './../lib/auth';
-
 // Firebase
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, get, push } from 'firebase/database';
@@ -54,23 +53,6 @@ try {
   }
 }
 
-// Razorpay Configuration
-const RAZORPAY_CONFIG = {
-  key_id: "rzp_live_RjxoVsUGVyJUhQ",
-  key_secret: "shF22XqtflD64nRd2GdzCYoT",
-};
-
-// Load Razorpay script
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
-
 // Cookie helpers
 const getCookie = (name: string) => {
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -89,7 +71,6 @@ export default function Affiliate() {
   const [loading, setLoading] = useState(false);
   const [referrerName, setReferrerName] = useState('');
   const [referrerId, setReferrerId] = useState<string | null>(null);
-  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   /* ---------- Initialize User ID ---------- */
   useEffect(() => {
@@ -99,11 +80,6 @@ export default function Affiliate() {
       document.cookie = `swissgain_uid=${uid};path=/;max-age=31536000`;
     }
     setUserId(uid);
-    
-    // Load Razorpay script
-    loadRazorpayScript().then((loaded) => {
-      setRazorpayLoaded(!!loaded);
-    });
   }, []);
 
   /* ---------- Check for referral parameter ---------- */
@@ -183,7 +159,7 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 1
+        purchaseAmount: 999
       };
      
       await set(newRef, referralData);
@@ -229,144 +205,7 @@ export default function Affiliate() {
     return `${namePart}${randomPart}`;
   };
 
-  /* ---------- Razorpay Payment Handler ---------- */
-  const initiateRazorpayPayment = async () => {
-    if (!razorpayLoaded) {
-      toast({
-        title: 'Payment Error',
-        description: 'Payment system is loading. Please try again in a moment.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    if (!window.Razorpay) {
-      toast({
-        title: 'Payment Error',
-        description: 'Razorpay not available. Please refresh the page.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    const options = {
-      key: RAZORPAY_CONFIG.key_id,
-      amount: 100, // ₹999 in paise
-      currency: 'INR',
-      name: 'SwissGain',
-      description: 'Affiliate Membership Registration',
-      image: '/logo.png',
-      handler: async function (response: any) {
-        console.log('Payment successful:', response);
-        await completeRegistrationAfterPayment(response);
-      },
-      prefill: {
-        name: userDetails.name,
-        email: userDetails.email,
-        contact: userDetails.phone,
-      },
-      notes: {
-        address: 'SwissGain Affiliate Program',
-        user_id: userId,
-      },
-      theme: {
-        color: '#b45309',
-      },
-      modal: {
-        ondismiss: function() {
-          toast({
-            title: 'Payment Cancelled',
-            description: 'You cancelled the payment process.',
-            variant: 'default',
-          });
-        }
-      }
-    };
-
-    try {
-      const razorpayInstance = new window.Razorpay(options);
-      razorpayInstance.open();
-      return true;
-    } catch (error) {
-      console.error('Razorpay initialization error:', error);
-      toast({
-        title: 'Payment Error',
-        description: 'Failed to initialize payment. Please try again.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-  };
-
-  /* ---------- Complete registration after successful payment ---------- */
-  const completeRegistrationAfterPayment = async (paymentResponse: any) => {
-    setLoading(true);
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const refCode = urlParams.get('ref');
-     
-      const userRef = ref(database, `affiliates/${userId}`);
-      const referralCode = generateReferralCode(userDetails.name, userId);
-     
-      const userData = {
-        uid: userId,
-        name: userDetails.name,
-        email: userDetails.email,
-        phone: userDetails.phone,
-        isAffiliate: true,
-        joinDate: new Date().toISOString(),
-        referralCode: referralCode,
-        referralLink: `${window.location.origin}/affiliate?ref=${referralCode}`,
-        payment: {
-          razorpay_payment_id: paymentResponse.razorpay_payment_id,
-          razorpay_order_id: paymentResponse.razorpay_order_id,
-          razorpay_signature: paymentResponse.razorpay_signature,
-          amount: 1,
-          currency: 'INR',
-          status: 'completed',
-          paid_at: new Date().toISOString(),
-        },
-        ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
-      };
-
-      await set(userRef, userData);
-
-      // ✅ Login the user through shared auth context
-      login(userData);
-
-      if (refCode && referrerId) {
-        await trackReferral(userId, referrerId, userDetails);
-        toast({
-          title: 'Referral Tracked!',
-          description: `You were referred by ${referrerName}. They will be notified.`,
-        });
-      }
-
-      setShowPayment(false);
-      setUserDetails({ name: '', email: '', phone: '' });
-     
-      toast({
-        title: 'Payment Successful! 🎉',
-        description: 'Welcome to SwissGain Affiliate Program! Redirecting to dashboard...',
-      });
-
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 2000);
-
-    } catch (error) {
-      console.error('Registration error after payment:', error);
-      toast({
-        title: 'Registration Error',
-        description: 'Payment was successful but registration failed. Please contact support.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ---------- Payment Handler ---------- */
+  /* ---------- Registration ---------- */
   const handlePayment = async () => {
     if (!userDetails.name || !userDetails.email || !userDetails.phone) {
       toast({
@@ -376,7 +215,6 @@ export default function Affiliate() {
       });
       return;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userDetails.email)) {
       toast({
@@ -395,7 +233,6 @@ export default function Affiliate() {
       });
       return;
     }
-
     if (!userId) {
       toast({
         title: 'Error',
@@ -404,10 +241,9 @@ export default function Affiliate() {
       });
       return;
     }
-
     setLoading(true);
-
     try {
+      // Check if email already exists
       const emailExists = await checkEmailExists(userDetails.email);
      
       if (emailExists) {
@@ -420,20 +256,61 @@ export default function Affiliate() {
         setLoading(false);
         return;
       }
-
-      const paymentInitiated = await initiateRazorpayPayment();
       
-      if (!paymentInitiated) {
-        setLoading(false);
+      // Get referral code from URL if exists
+      const urlParams = new URLSearchParams(window.location.search);
+      const refCode = urlParams.get('ref');
+     
+      // Save new affiliate
+      const userRef = ref(database, `affiliates/${userId}`);
+      const referralCode = generateReferralCode(userDetails.name, userId);
+     
+      const userData = {
+        uid: userId,
+        name: userDetails.name,
+        email: userDetails.email,
+        phone: userDetails.phone,
+        isAffiliate: true,
+        joinDate: new Date().toISOString(),
+        referralCode: referralCode,
+        referralLink: `${window.location.origin}/affiliate?ref=${referralCode}`,
+        ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
+      };
+      
+      await set(userRef, userData);
+      
+      // Login the user immediately after registration
+      login(userData);
+      
+      // Track referral if refCode exists and referrerId is found
+      if (refCode && referrerId) {
+        await trackReferral(userId, referrerId, userDetails);
+        toast({
+          title: 'Referral Tracked!',
+          description: `You were referred by ${referrerName}. They will be notified.`,
+        });
       }
-
-    } catch (error) {
-      console.error('Payment initiation error:', error);
+      
+      setShowPayment(false);
+      setUserDetails({ name: '', email: '', phone: '' });
+     
       toast({
-        title: 'Payment Failed',
-        description: 'Failed to process payment. Please try again.',
+        title: 'Welcome to SwissGain!',
+        description: 'You are now an affiliate member. To activate commissions, purchase a product worth ₹2999. Redirecting to dashboard...',
+      });
+      
+      // Redirect to dashboard after a delay
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 2000);
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to register. Please try again.',
         variant: 'destructive',
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -467,13 +344,12 @@ export default function Affiliate() {
       });
       return;
     }
-
+    
     setLoading(true);
     try {
       const user = await findUserByCredentials(loginCreds.email, loginCreds.phone);
      
       if (user) {
-        // ✅ Login through shared auth context
         login(user);
         setShowLogin(false);
         setLoginCreds({ email: '', phone: '' });
@@ -566,7 +442,7 @@ export default function Affiliate() {
                   <CreditCard className="h-5 w-5" />
                   Complete Registration
                 </CardTitle>
-                <CardDescription>Join the affiliate program with secure payment</CardDescription>
+                <CardDescription>Join the affiliate program with one-time payment</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
@@ -607,13 +483,12 @@ export default function Affiliate() {
                     />
                   </div>
                 </div>
-
                 <div className="bg-muted p-4 rounded-lg">
                   <h4 className="font-semibold mb-2">Payment Summary</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Affiliate Membership:</span>
-                      <span>₹1</span>
+                      <span>₹999</span>
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>One-time lifetime fee</span>
@@ -624,19 +499,17 @@ export default function Affiliate() {
                     </div>
                   </div>
                 </div>
-
-                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                  <p className="text-xs text-green-700">
-                    <strong>Secure Payment:</strong> Powered by Razorpay. Your payment details are safe and encrypted.
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-700">
+                    <strong>Note:</strong> Your data will be securely stored in our database.
                   </p>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <Button variant="outline" onClick={() => setShowPayment(false)} disabled={loading}>
                     Cancel
                   </Button>
-                  <Button onClick={handlePayment} disabled={loading || !razorpayLoaded}>
-                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹1'}
+                  <Button onClick={handlePayment} disabled={loading}>
+                    {loading ? 'Processing...' : 'Complete Registration'}
                   </Button>
                 </div>
               </CardContent>
@@ -732,7 +605,7 @@ export default function Affiliate() {
                       <p className="text-sm font-medium text-white/90">Product Price</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#d97706]/50 shadow-sm">
-                      <div className="text-3xl font-bold text-white mb-1">₹1</div>
+                      <div className="text-3xl font-bold text-white mb-1">₹999</div>
                       <p className="text-sm font-medium text-white/90">Membership Fee</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#b45309]/50 shadow-sm">
@@ -776,7 +649,7 @@ export default function Affiliate() {
                     </h4>
                     <p className="text-sm text-muted-foreground">
                       As a Starter rank affiliate, you earn ₹100 per sale. With just 10 sales,
-                      you recover your ₹1 membership fee and start making profit!
+                      you recover your ₹999 membership fee and start making profit!
                     </p>
                   </div>
                 </div>
@@ -793,7 +666,7 @@ export default function Affiliate() {
               </div>
               <CardTitle className="text-2xl font-bold text-foreground mb-2">Affiliate Membership</CardTitle>
               <div className="text-4xl font-bold text-primary mb-2">
-                ₹1<span className="text-lg font-normal text-muted-foreground">/ lifetime</span>
+                ₹999<span className="text-lg font-normal text-muted-foreground">/ lifetime</span>
               </div>
               <CardDescription>One-time membership fee with no recurring charges</CardDescription>
             </CardHeader>
@@ -856,11 +729,4 @@ export default function Affiliate() {
       </div>
     </div>
   );
-}
-
-// Add Razorpay type declaration
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
 }
