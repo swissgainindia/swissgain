@@ -1,6 +1,6 @@
-// ProductDetail.tsx - FULLY SELF-CONTAINED WITH RAZORPAY (NO BACKEND API NEEDED)
+'use client';
 import { useState, useEffect } from 'react';
-import { useRoute, Link } from 'wouter';
+import { useRoute, Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -11,15 +11,10 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '@/components/product-card';
-import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, ArrowLeft } from 'lucide-react';
+import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard } from 'lucide-react';
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
-import crypto from 'crypto'; // Node.js crypto (works in Next.js 13+ with app router)
-
-// ==================== RAZORPAY LIVE CONFIG ====================
-const RAZORPAY_KEY_ID = "rzp_live_RjxoVsUGVyJUhQ";
-const RAZORPAY_KEY_SECRET = "shF22XqtflD64nRd2GdzCYoT";
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -33,7 +28,7 @@ const firebaseConfig = {
   measurementId: "G-VTKPWVEY0S"
 };
 
-// Initialize Firebase
+// Initialize Firebase only once
 let database: any = null;
 const initializeFirebase = () => {
   if (database) return database;
@@ -54,7 +49,34 @@ const initializeFirebase = () => {
 };
 const firebaseDatabase = initializeFirebase();
 
-// Commission Rates
+// Razorpay Configuration
+const RAZORPAY_CONFIG = {
+  key_id: "rzp_live_RjxoVsUGVyJUhQ",
+  key_secret: "shF22XqtflD64nRd2GdzCYoT",
+};
+
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(false);
+      return;
+    }
+    
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+// Commission rates (total ~24.4%)
 const commissionRates = [0.10, 0.05, 0.025, 0.02, 0.015, 0.01, 0.008, 0.006, 0.005, 0.005];
 
 interface OrderData {
@@ -67,7 +89,15 @@ interface OrderData {
   originalPrice?: number;
   quantity: number;
   totalAmount: number;
-  customerInfo: any;
+  customerInfo: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
   status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   createdAt: string;
   images: string[];
@@ -78,12 +108,14 @@ interface OrderData {
   productBrand?: string;
   productRating?: number;
   productReviews?: number;
+  paymentId?: string;
+  paymentMethod: 'razorpay' | 'cod';
+  paymentStatus: 'pending' | 'paid' | 'failed';
   razorpayOrderId?: string;
-  razorpayPaymentId?: string;
   razorpaySignature?: string;
 }
 
-// Customer ID
+// Customer ID Helpers
 const generateUniqueCustomerId = () => {
   if (typeof window === 'undefined') return "default_customer";
   let customerId = localStorage.getItem('uniqueCustomerId');
@@ -96,9 +128,11 @@ const generateUniqueCustomerId = () => {
   }
   return customerId;
 };
+
 const getOrCreateCustomerId = () => generateUniqueCustomerId();
 
 const getCookie = (name: string) => {
+  if (typeof document === 'undefined') return null;
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? m[2] : null;
 };
@@ -128,22 +162,42 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
   try {
     const ordersRef = ref(firebaseDatabase, 'orders');
     const newOrderRef = push(ordersRef);
-    await set(newOrderRef, {
+    const orderId = newOrderRef.key!;
+    
+    const orderWithId = {
       ...orderData,
-      id: newOrderRef.key,
+      id: orderId,
       uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       commissionProcessed: false,
       creditedUplines: {}
-    });
-    return newOrderRef.key!;
+    };
+    
+    await set(newOrderRef, orderWithId);
+    return orderId;
   } catch (error) {
     console.error('Error saving order:', error);
     throw error;
   }
 };
 
-// Save Commission
+// Update Order Payment Status
+const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
+  try {
+    const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+    await update(orderRef, {
+      paymentId,
+      paymentStatus: status,
+      status: status === 'paid' ? 'confirmed' : 'cancelled',
+      paymentUpdatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    throw error;
+  }
+};
+
+// Save Commission Record
 const saveCommissionRecord = async (commissionData: any): Promise<void> => {
   try {
     const commissionsRef = ref(firebaseDatabase, `commissions/${commissionData.affiliateId}`);
@@ -151,6 +205,7 @@ const saveCommissionRecord = async (commissionData: any): Promise<void> => {
     await set(newCommissionRef, {
       ...commissionData,
       id: newCommissionRef.key,
+      uniqueCommissionId: `commission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       status: 'completed'
     });
@@ -166,12 +221,13 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
     const walletRef = ref(firebaseDatabase, `wallets/${affiliateId}`);
     const transactionRef = push(ref(firebaseDatabase, `transactions/${affiliateId}`));
     const snap = await get(walletRef);
-    const currentBalance = snap.exists() ? snap.val().balance || 0 : 0;
+    const currentBalance = snap.exists() ? snap.val().balance : 0;
+   
     const newBalance = currentBalance + amount;
 
     await set(walletRef, {
       balance: newBalance,
-      upiId: snap.exists() ? snap.val().upiId || '' : '',
+      upiId: snap.exists() ? snap.val().upiId : '',
       lastUpdated: new Date().toISOString()
     });
 
@@ -184,8 +240,36 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
       orderId,
       status: 'completed'
     });
+
+    console.log(`💰 Wallet updated for ${affiliateId}: +₹${amount} = ₹${newBalance}`);
   } catch (error) {
     console.error('Error adding to wallet:', error);
+    throw error;
+  }
+};
+
+// Update Referral After Purchase
+const updateReferralAfterPurchase = async (affiliateId: string, customerId: string, customerName: string, customerEmail: string, earnings: number, productName: string, orderId: string): Promise<void> => {
+  try {
+    const uniqueReferralId = `ref_${customerId}_${Date.now()}`;
+    const referralRef = ref(firebaseDatabase, `referrals/${affiliateId}/${uniqueReferralId}`);
+    await set(referralRef, {
+      referredUserId: customerId,
+      referredUserName: customerName,
+      referredUserEmail: customerEmail,
+      joinedAt: new Date().toISOString(),
+      status: 'completed',
+      earnings,
+      purchaseAmount: earnings * 10,
+      purchaseDate: new Date().toISOString(),
+      walletCredited: true,
+      productName,
+      orderId,
+      uniqueReferralId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating referral:', error);
     throw error;
   }
 };
@@ -195,330 +279,838 @@ const updateReferralStats = async (affiliateId: string, amount: number): Promise
   try {
     const statsRef = ref(firebaseDatabase, `referrals/${affiliateId}/stats`);
     const snap = await get(statsRef);
-    const current = snap.exists() ? snap.val() : { totalReferrals: 0, referralEarnings: 0, totalSales: 0 };
+    const currentStats = snap.exists() ? snap.val() : { totalReferrals: 0, referralEarnings: 0, totalSales: 0 };
     await set(statsRef, {
-      totalReferrals: (current.totalReferrals || 0) + 1,
-      referralEarnings: (current.referralEarnings || 0) + amount,
-      totalSales: (current.totalSales || 0) + 1
+      ...currentStats,
+      referralEarnings: (currentStats.referralEarnings || 0) + amount,
+      totalSales: (currentStats.totalSales || 0) + 1
     });
   } catch (error) {
-    console.error('Error updating referral stats:', error);
+    console.error('Error updating stats:', error);
   }
 };
 
-// Give Direct Referral Bonus (10% + ₹100)
-const giveCombinedReferralBonus = async (directReferrerId: string, customerName: string, productName: string, orderId: string, totalAmount: number) => {
-  const commission = Math.round(totalAmount * 0.10);
-  const bonus = 100;
-  const total = commission + bonus;
+// Combined 10% + ₹100 Fixed Bonus for Direct Referral Link Purchase
+const giveCombinedReferralBonus = async (directReferrerId: string, customerName: string, productName: string, orderId: string, totalAmount: number): Promise<void> => {
+  try {
+    // Calculate 10% commission
+    const commissionAmount = Math.round(totalAmount * 0.10);
+    const fixedBonusAmount = 100;
+    const totalEarnings = commissionAmount + fixedBonusAmount;
 
-  const desc = `Level 1: 10% (₹${commission}) + ₹100 bonus from ${customerName}'s purchase of ${productName}`;
-
-  await saveCommissionRecord({
-    affiliateId: directReferrerId,
-    affiliateName: 'Direct Referrer',
-    customerName,
-    orderId,
-    productName,
-    purchaseAmount: totalAmount,
-    commissionAmount: total,
-    commissionRate: '10% + ₹100 Bonus',
-    level: 1,
-    description: desc,
-    type: 'combined_bonus',
-  });
-
-  await addCommissionToWallet(directReferrerId, total, desc, orderId);
-  await updateReferralStats(directReferrerId, total);
-};
-
-// Process Multi-Level Commissions
-const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: string, totalAmount: number, formData: any, product: any) => {
-  const chain = await getUplineChain(buyerAffiliateId);
-  if (chain.length === 0) return;
-
-  for (const upline of chain) {
-    const level = upline.level;
-    const rate = commissionRates[level - 1];
-    let amount = Math.round(totalAmount * rate);
-    if (level === 1) amount += 100;
-
-    const desc = level === 1
-      ? `Level 1 commission + ₹100 bonus from ${formData.name}'s purchase`
-      : `Level ${level} commission from ${formData.name}'s purchase`;
+    const transactionDescription = `Level 1 commission (10.0%) from ${customerName}'s purchase of ${productName} + ₹${fixedBonusAmount} fixed affiliate bonus`;
+    
+    const commissionDescription = `Combined earnings: 10% commission (₹${commissionAmount}) + ₹${fixedBonusAmount} bonus = ₹${totalEarnings} from ${customerName}'s purchase of ${productName}`;
 
     await saveCommissionRecord({
-      affiliateId: upline.id,
-      affiliateName: upline.name,
-      customerName: formData.name,
+      affiliateId: directReferrerId,
+      affiliateName: 'Direct Referrer',
+      customerId: 'guest',
+      customerName,
+      customerEmail: '',
+      customerPhone: '',
       orderId,
-      productName: product.name,
+      productName,
+      productDescription: productName,
+      productCategory: 'Combined Commission + Bonus',
+      productBrand: 'SwissGain',
+      productImages: [],
       purchaseAmount: totalAmount,
-      commissionAmount: amount,
-      commissionRate: level === 1 ? '10% + ₹100' : (rate * 100).toFixed(1) + '%',
-      level,
-      description: desc,
+      commissionAmount: totalEarnings,
+      commissionRate: '10% + ₹100 Bonus',
+      level: 1,
+      description: commissionDescription,
+      status: 'completed',
+      type: 'combined_referral_bonus',
+      timestamp: new Date().toISOString(),
+      breakdown: {
+        commission: commissionAmount,
+        fixedBonus: fixedBonusAmount,
+        total: totalEarnings
+      }
     });
 
-    await addCommissionToWallet(upline.id, amount, desc, orderId);
-    await updateReferralStats(upline.id, amount);
+    await addCommissionToWallet(directReferrerId, totalEarnings, transactionDescription, orderId);
+    await updateReferralStats(directReferrerId, totalEarnings);
+    
+    console.log(`✅ Combined bonus given: ₹${totalEarnings} (₹${commissionAmount} + ₹${fixedBonusAmount}) to ${directReferrerId}`);
+  } catch (error) {
+    console.error('❌ Failed to give combined referral bonus:', error);
+    throw error;
   }
 };
 
-// Load Razorpay Script
-const loadRazorpay = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
+// Process multi-level commissions
+const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: string, totalAmount: number, formData: any, product: any) => {
+  try {
+    const chain = await getUplineChain(buyerAffiliateId);
+    if (chain.length === 0) return;
+
+    const creditedUplines = chain.reduce((acc, u) => ({ ...acc, [u.id]: true }), {});
+    await update(ref(firebaseDatabase, `orders/${orderId}`), { creditedUplines });
+
+    for (const upline of chain) {
+      const level = upline.level;
+      const rate = commissionRates[level - 1];
+      
+      let commissionAmount = Math.round(totalAmount * rate);
+      let fixedBonusAmount = 0;
+      
+      if (level === 1) {
+        fixedBonusAmount = 100;
+        commissionAmount += fixedBonusAmount;
+      }
+      
+      let description = '';
+      if (level === 1) {
+        description = `Level ${level} commission (${(rate * 100).toFixed(1)}%) from ${formData.name}'s purchase of ${product.name} + ₹${fixedBonusAmount} fixed affiliate bonus`;
+      } else {
+        description = `Level ${level} commission (${(rate * 100).toFixed(1)}%) from ${formData.name}'s purchase`;
+      }
+
+      await saveCommissionRecord({
+        affiliateId: upline.id,
+        affiliateName: upline.name,
+        customerId: buyerAffiliateId,
+        customerName: formData.name,
+        customerEmail: formData.email,
+        orderId,
+        productName: product.name,
+        purchaseAmount: totalAmount,
+        commissionAmount,
+        commissionRate: level === 1 ? '10% + ₹100 Bonus' : (rate * 100).toFixed(1) + '%',
+        level,
+        description,
+        status: 'completed',
+        timestamp: new Date().toISOString(),
+        ...(level === 1 && {
+          type: 'combined_referral_bonus',
+          breakdown: {
+            commission: Math.round(totalAmount * rate),
+            fixedBonus: fixedBonusAmount,
+            total: commissionAmount
+          }
+        })
+      });
+
+      await addCommissionToWallet(upline.id, commissionAmount, description, orderId);
+      await updateReferralStats(upline.id, commissionAmount);
+
+      console.log(`💰 Level ${level} commission: ₹${commissionAmount} (${rate * 100}% ${level === 1 ? '+ ₹100 bonus' : ''}) to ${upline.id}`);
     }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
+
+    if (chain.length > 0) {
+      const directComm = Math.round(totalAmount * 0.10) + 100;
+      await updateReferralAfterPurchase(chain[0].id, buyerAffiliateId, formData.name, formData.email, directComm, product.name, orderId);
+    }
+  } catch (error) {
+    console.error('Multi-level commission failed:', error);
+    throw error;
+  }
 };
 
-// Checkout Modal with Full Razorpay Inside
-function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: any) {
+// Checkout Modal with Razorpay Integration
+interface CheckoutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  product: any;
+  quantity: number;
+  affiliateId?: string;
+  customerId: string;
+  uid?: string;
+}
+
+function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
-
   const totalAmount = product.price * quantity;
 
-  const handlePayment = async (e: any) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
-      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
-      return;
-    }
-
-    setLoading(true);
-    const loaded = await loadRazorpay();
-    if (!loaded) {
-      toast({ title: "Error", description: "Failed to load payment gateway", variant: "destructive" });
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // Create order directly using Razorpay API (client-side allowed with secret)
-      const orderResponse = await fetch("https://api.razorpay.com/v1/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Basic " + btoa(RAZORPAY_KEY_ID + ":" + RAZORPAY_KEY_SECRET),
-        },
-        body: JSON.stringify({
-          amount: totalAmount * 100, // paise
-          currency: "INR",
-          receipt: `receipt_${Date.now()}`,
-        }),
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+      
+      // Load Razorpay script when modal opens
+      loadRazorpayScript().then((loaded) => {
+        setRazorpayLoaded(!!loaded);
+        if (!loaded) {
+          toast({
+            title: 'Payment System Error',
+            description: 'Failed to load payment system. Please refresh the page.',
+            variant: 'destructive',
+          });
+        }
       });
+    }
+  }, [isOpen]);
 
-      const order = await orderResponse.json();
-      if (order.error) throw new Error(order.error.description);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-      const options = {
-        key: RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: order.currency,
-        name: "SwissGain India",
-        description: `Purchase of ${product.name}`,
-        order_id: order.id,
-        handler: async (response: any) => {
-          try {
-            // Verify signature
-            const expectedSignature = crypto
-              .createHmac("sha256", RAZORPAY_KEY_SECRET)
-              .update(response.razorpay_order_id + "|" + response.razorpay_payment_id)
-              .digest("hex");
+  const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
-            if (expectedSignature !== response.razorpay_signature) {
-              throw new Error("Invalid payment signature");
-            }
+  // Initiate Razorpay Payment
+ // Replace the initiateRazorpayPayment function with this:
+const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) => {
+  if (!razorpayLoaded) {
+    toast({
+      title: 'Payment Error',
+      description: 'Payment system is loading. Please try again in a moment.',
+      variant: 'destructive',
+    });
+    return false;
+  }
 
-            // Save Order
-            const orderData: OrderData = {
-              productId: product._id,
-              affiliateId,
-              customerId: uid || generateUniqueCustomerId(),
-              originalCustomerId: customerId,
-              productName: product.name,
-              price: product.price,
-              quantity,
-              totalAmount,
-              customerInfo: formData,
-              status: 'confirmed',
-              createdAt: new Date().toISOString(),
-              images: product.images,
-              category: product.category,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            };
+  if (!window.Razorpay) {
+    toast({
+      title: 'Payment Error',
+      description: 'Razorpay not available. Please refresh the page.',
+      variant: 'destructive',
+    });
+    return false;
+  }
 
-            const orderId = await saveOrderToFirebase(orderData);
-
-            // Process Commissions
-            if (affiliateId && uid !== affiliateId) {
-              const snap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
-              if (snap.exists()) {
-                await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
-              }
-            }
-
-            if (uid) {
-              const snap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
-              if (snap.exists() && snap.val().isAffiliate) {
-                await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
-              }
-            }
-
-            toast({ title: "Success!", description: "Payment successful & order confirmed!" });
-            onClose();
-          } catch (err: any) {
-            toast({ title: "Payment Failed", description: err.message, variant: "destructive" });
-          }
-        },
-        prefill: {
-          name: formData.name,
-          email: formData.email,
-          contact: formData.phone,
-        },
-        theme: { color: "#f59e0b" },
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Payment failed", variant: "destructive" });
-    } finally {
-      setLoading(false);
+  const options = {
+    key: RAZORPAY_CONFIG.key_id,
+    amount: totalAmount * 100, // Convert to paise
+    currency: 'INR',
+    name: 'SwissGain',
+    description: `Purchase: ${product.name}`,
+    image: '/logo.png',
+    handler: async function (response: any) {
+      console.log('Payment successful:', response);
+      await handleSuccessfulPayment(response, orderData, orderId);
+    },
+    prefill: {
+      name: formData.name,
+      email: formData.email,
+      contact: formData.phone,
+    },
+    notes: {
+      address: formData.address,
+      order_id: orderId,
+      product_id: product._id,
+      customer_id: customerId,
+      affiliate_id: affiliateId || 'none'
+    },
+    theme: {
+      color: '#b45309',
+    },
+    modal: {
+      ondismiss: function() {
+        toast({
+          title: 'Payment Cancelled',
+          description: 'You cancelled the payment process.',
+          variant: 'default',
+        });
+      }
     }
   };
+
+  try {
+    const razorpayInstance = new window.Razorpay(options);
+    razorpayInstance.open();
+    return true;
+  } catch (error) {
+    console.error('Razorpay initialization error:', error);
+    toast({
+      title: 'Payment Error',
+      description: 'Failed to initialize payment. Please try again.',
+      variant: 'destructive',
+    });
+    return false;
+  }
+};
+
+  // Handle successful payment
+ // Replace the handleSuccessfulPayment function with this:
+const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
+  setPaymentLoading(true);
+  try {
+    // Update order with payment info
+    await updateOrderPaymentStatus(orderId, paymentResponse.razorpay_payment_id, 'paid');
+    
+    // Mark order as confirmed
+    const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+    await update(orderRef, {
+      status: 'confirmed',
+      paymentUpdatedAt: new Date().toISOString(),
+      razorpayOrderId: paymentResponse.razorpay_order_id,
+      razorpaySignature: paymentResponse.razorpay_signature
+    });
+    
+    // Process commissions
+    await processCommissionsAfterPayment(orderId, orderData);
+    
+    toast({
+      title: "Payment Successful! 🎉",
+      description: `Order placed successfully. Payment ID: ${paymentResponse.razorpay_payment_id}`,
+    });
+
+    setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+    onClose();
+    
+    // Redirect to thank you page after delay
+    setTimeout(() => {
+      window.location.href = `/thank-you?order=${orderId}`;
+    }, 2000);
+    
+  } catch (error: any) {
+    console.error('Payment processing error:', error);
+    toast({
+      title: "Payment Processing Error",
+      description: "Payment was successful but order processing failed. Please contact support.",
+      variant: "destructive",
+    });
+  } finally {
+    setPaymentLoading(false);
+  }
+};
+
+  // Process commissions after payment
+  const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
+    try {
+      // Combined 10% + ₹100 Bonus for Direct Referral Link
+      if (affiliateId && uid !== affiliateId) {
+        const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
+        if (referrerSnap.exists()) {
+          console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
+          await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
+        } else {
+          console.log(`❌ Affiliate ${affiliateId} not found in database`);
+        }
+      } else {
+        console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
+      }
+
+      // Multi-level commissions (only if buyer is affiliate)
+      if (uid) {
+        const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
+        if (affSnap.exists() && affSnap.val().isAffiliate) {
+          console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
+          await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
+        } else {
+          console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
+        }
+      }
+
+      console.log(`✅ All commissions processed for order: ${orderId}`);
+    } catch (error) {
+      console.error('Commission processing error:', error);
+      throw error;
+    }
+  };
+
+ // Replace the handleSubmit function with this:
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
+    toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const purchaseCustomerId = generatePurchaseCustomerId();
+    const orderData: OrderData = {
+      productId: product._id,
+      ...(affiliateId && { affiliateId }),
+      customerId: purchaseCustomerId,
+      originalCustomerId: customerId,
+      productName: product.name,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      quantity,
+      totalAmount,
+      customerInfo: formData,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      images: product.images,
+      category: product.category,
+      discount: product.discount,
+      productDescription: product.description,
+      productFeatures: product.features,
+      productBrand: product.brand || 'SwissGain',
+      productRating: product.rating,
+      productReviews: product.reviews,
+      paymentMethod: 'razorpay',
+      paymentStatus: 'pending'
+    };
+
+    const orderId = await saveOrderToFirebase(orderData);
+    console.log(`✅ Order saved: ${orderId}`);
+
+    // Update order with pending payment status
+    const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+    await update(orderRef, {
+      uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString()
+    });
+
+    // Initiate Razorpay payment
+    const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
+    
+    if (!paymentInitiated) {
+      setLoading(false);
+    }
+
+  } catch (error: any) {
+    console.error('❌ Order placement error:', error);
+    toast({
+      title: "Error",
+      description: error.message || "Failed to place order.",
+      variant: "destructive",
+    });
+    setLoading(false);
+  }
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Complete Your Purchase</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Secure Checkout
+          </DialogTitle>
+        </DialogHeader>
         <div className="space-y-6">
           <div className="bg-muted p-4 rounded-lg">
             <h3 className="font-semibold mb-3">Order Summary</h3>
-            <div className="flex items-center gap-3 mb-3">
-              <img src={product.images[0]} alt={product.name} className="w-16 h-16 rounded object-cover" />
-              <div>
+            <div className="flex items-center space-x-3 mb-3">
+              <img src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" />
+              <div className="flex-1">
                 <p className="font-medium">{product.name}</p>
-                <p className="text-sm text-muted-foreground">₹{product.price.toLocaleString()} × {quantity}</p>
+                <p className="text-sm text-muted-foreground">Quantity: {quantity}</p>
+                <p className="font-semibold">₹{product.price.toLocaleString()} each</p>
               </div>
             </div>
-            <div className="border-t pt-3 text-lg font-bold">
-              Total: ₹{totalAmount.toLocaleString()}
+            <div className="border-t pt-3">
+              <div className="flex justify-between text-sm mb-1">
+                <span>Subtotal:</span>
+                <span>₹{(product.price * quantity).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm mb-1">
+                <span>Shipping:</span>
+                <span className="text-green-600">FREE</span>
+              </div>
+              <div className="flex justify-between font-semibold text-lg mt-2 pt-2 border-t">
+                <span>Total Amount:</span>
+                <span>₹{totalAmount.toLocaleString()}</span>
+              </div>
             </div>
           </div>
 
-          <form onSubmit={handlePayment} className="space-y-4">
-            <div><Label>Full Name *</Label><Input name="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
-            <div><Label>Email *</Label><Input name="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required /></div>
-            <div><Label>Phone *</Label><Input name="phone" type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required /></div>
-            <div><Label>Address *</Label><Input name="address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} required /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>City *</Label><Input name="city" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required /></div>
-              <div><Label>State *</Label><Input name="state" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} required /></div>
+          {affiliateId && (
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+              <p className="text-sm font-medium text-green-800">Referral Purchase Detected</p>
+              <p className="text-xs text-green-700 mt-1">
+                Your referrer will earn 10% commission + ₹100 bonus = ₹{Math.round(totalAmount * 0.10) + 100} on this purchase!
+              </p>
             </div>
-            <div><Label>PIN Code *</Label><Input name="pincode" value={formData.pincode} onChange={(e) => setFormData({ ...formData, pincode: e.target.value })} required /></div>
+          )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Processing..." : `Pay ₹${totalAmount.toLocaleString()} via Razorpay`}
-            </Button>
+          {uid && (
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <p className="text-sm font-medium text-blue-800">Affiliate Purchase</p>
+              <p className="text-xs text-blue-700 mt-1">Your upline will earn commissions on this purchase.</p>
+            </div>
+          )}
+
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <p className="text-sm font-medium text-blue-800">Your Customer ID</p>
+            <div className="mt-2 flex items-center justify-between bg-white p-2 rounded border">
+              <code className="text-xs text-blue-700 font-mono bg-blue-50 px-2 py-1 rounded">{customerId}</code>
+              <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(customerId)}>Copy</Button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Full Name *</Label>
+              <Input name="name" value={formData.name} onChange={handleInputChange} required placeholder="Enter your full name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input name="email" type="email" value={formData.email} onChange={handleInputChange} required placeholder="your@email.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone *</Label>
+              <Input name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required placeholder="9876543210" />
+            </div>
+            <div className="space-y-2">
+              <Label>Address *</Label>
+              <Input name="address" value={formData.address} onChange={handleInputChange} required placeholder="Street address, building, etc." />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>City *</Label>
+                <Input name="city" value={formData.city} onChange={handleInputChange} required placeholder="Your city" />
+              </div>
+              <div className="space-y-2">
+                <Label>State *</Label>
+                <Input name="state" value={formData.state} onChange={handleInputChange} required placeholder="Your state" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>PIN Code *</Label>
+              <Input name="pincode" value={formData.pincode} onChange={handleInputChange} required placeholder="6-digit PIN" />
+            </div>
+            
+            {/* Replace the payment info section with this: */}
+<div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+  <div className="flex items-center gap-2 mb-2">
+    <Shield className="h-4 w-4 text-primary" />
+    <span className="text-sm font-medium">Secure Payment by Razorpay</span>
+  </div>
+  <p className="text-xs text-muted-foreground">
+    Your payment information is encrypted and secure. We never store your card details.
+  </p>
+  <div className="mt-2 flex items-center justify-between text-xs">
+    <span className="text-muted-foreground">Payment Methods:</span>
+    <div className="flex items-center gap-1">
+      <span className="bg-white px-2 py-1 rounded border">Credit Card</span>
+      <span className="bg-white px-2 py-1 rounded border">Debit Card</span>
+      <span className="bg-white px-2 py-1 rounded border">UPI</span>
+      <span className="bg-white px-2 py-1 rounded border">Net Banking</span>
+    </div>
+  </div>
+</div>
+
+{/* Update the submit button with this: */}
+<Button 
+  type="submit" 
+  className="w-full gradient-primary text-primary-foreground py-3" 
+  disabled={loading || paymentLoading || !razorpayLoaded}
+>
+  {paymentLoading ? 'Processing Payment...' : 
+   loading ? 'Creating Order...' : 
+   !razorpayLoaded ? 'Loading Payment...' : 
+   `Pay Securely ₹${totalAmount.toLocaleString()}`}
+</Button>
           </form>
+
+          <div className="text-center text-xs text-gray-500">
+            By completing your purchase, you agree to our Terms of Service and Privacy Policy.
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image';
-const BASE_IMAGE_URL = 'https://swissgainindia.com';
+const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
+const BASE_IMAGE_URL = 'http://localhost:5000';
 
 export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
   const productId = params?.id;
-  const affiliateId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') || new URLSearchParams(window.location.search).get('affiliate') || undefined : undefined;
+  const getAffiliateIdFromUrl = () => {
+    if (typeof window === 'undefined') return undefined;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ref') || params.get('affiliate') || undefined;
+  };
+  const affiliateId = getAffiliateIdFromUrl();
   const uid = getCookie('swissgain_uid') || undefined;
   const customerId = uid || getOrCreateCustomerId();
 
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const { updateData } = useLocalStorage();
   const { toast } = useToast();
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchProduct = async () => {
       if (!productId) return;
       try {
         const res = await axios.get(`/api/products/${productId}`);
-        const p = res.data;
-        const images = [p.image, ...(p.images || [])].filter(Boolean).map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`);
-        setProduct({ ...p, images: images.length > 0 ? images : [FALLBACK_IMAGE] });
+        if (res.data) {
+          const mainImage = res.data.image ? (res.data.image.startsWith('http') ? res.data.image : `${BASE_IMAGE_URL}${res.data.image}`) : null;
+          const additionalImages = res.data.images ? (Array.isArray(res.data.images) ? res.data.images : res.data.images.split(',').map((s: string) => s.trim())) : [];
+          const allImages = [mainImage, ...additionalImages.filter(Boolean).map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)].filter(Boolean);
+          setProduct({
+            ...res.data,
+            images: allImages.length > 0 ? allImages : [FALLBACK_IMAGE],
+            affiliateId
+          });
 
-        const related = await axios.get(`/api/products?category=${p.category}`);
-        setRelatedProducts(related.data.filter((x: any) => x._id !== p._id).slice(0, 4));
+          const relatedRes = await axios.get(`/api/products?category=${res.data.category}`);
+          setRelatedProducts(relatedRes.data.filter((p: any) => p._id !== res.data._id).slice(0, 4).map((p: any) => {
+            const pImages = [p.image ? (p.image.startsWith('http') ? p.image : `${BASE_IMAGE_URL}${p.image}`) : null, ...(p.images || []).map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)].filter(Boolean);
+            return { ...p, images: pImages.length > 0 ? pImages : [FALLBACK_IMAGE] };
+          }));
+        } else setError(true);
       } catch (err) {
+        console.error('Failed to fetch product:', err);
         setError(true);
       } finally {
         setLoading(false);
       }
     };
     fetchProduct();
-  }, [productId]);
+  }, [productId, affiliateId]);
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    updateData(addProductToCart.bind(null, product, quantity));
+    toast({ 
+      title: 'Added to Cart', 
+      description: `${quantity} ${product.name}(s) added.` 
+    });
+  };
 
   const handleBuyNow = () => {
+    handleAddToCart();
     setIsCheckoutOpen(true);
   };
 
-  if (loading) return <div className="py-20 text-center">Loading...</div>;
-  if (error || !product) return <div className="py-20 text-center">Product not found</div>;
+  if (loading) return <div className="py-20 text-center text-xl">Loading product...</div>;
+  if (error || !product) return (
+    <div className="py-20 bg-white min-h-screen flex items-center justify-center text-center">
+      <div>
+        <h1 className="text-3xl font-bold mb-4">Product Not Found</h1>
+        <Link href="/products">
+          <Button className="gradient-primary text-primary-foreground">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="py-20 bg-white min-h-screen">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Your existing product UI here - unchanged */}
-        <div className="grid lg:grid-cols-2 gap-12">
-          <div>
-            <img src={product.images[0]} alt={product.name} className="w-full h-96 object-cover rounded-xl" />
-          </div>
-          <div className="space-y-8">
-            <h1 className="text-4xl font-bold">{product.name}</h1>
-            <p className="text-3xl font-bold text-orange-600">₹{product.price.toLocaleString()}</p>
-            <p className="text-lg text-gray-600">{product.description}</p>
+    <div className="py-20 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-8">
+          <Link href="/">Home</Link> <span>/</span>
+          <Link href="/products">Products</Link> <span>/</span>
+          <span className="capitalize">{product.category}</span> <span>/</span>
+          <span className="text-foreground">{product.name}</span>
+        </nav>
 
-            <div className="flex items-center gap-4">
-              <Button onClick={handleBuyNow} className="flex-1 text-lg py-6 bg-orange-600 hover:bg-orange-700">
-                Buy Now
-              </Button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
+          <div className="space-y-4">
+            <div className="relative">
+              <img 
+                src={product.images[selectedImageIndex] || FALLBACK_IMAGE} 
+                alt={product.name} 
+                className="rounded-xl shadow-lg w-full h-96 object-cover" 
+                onError={(e) => e.currentTarget.src = FALLBACK_IMAGE} 
+              />
+              {product.discount && (
+                <Badge variant="destructive" className="absolute top-4 left-4 text-lg px-3 py-1">
+                  {product.discount}% OFF
+                </Badge>
+              )}
+            </div>
+            {product.images.length > 1 && (
+              <div className="grid grid-cols-4 gap-4">
+                {product.images.map((img: string, i: number) => (
+                  <img 
+                    key={i} 
+                    src={img} 
+                    alt="" 
+                    className={`rounded-lg cursor-pointer h-20 object-cover ${selectedImageIndex === i ? 'ring-2 ring-primary' : ''}`} 
+                    onClick={() => setSelectedImageIndex(i)} 
+                    onError={(e) => e.currentTarget.src = FALLBACK_IMAGE} 
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-8">
+            <div>
+              <Badge variant="outline" className="mb-4 capitalize">{product.category}</Badge>
+              <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
+              <div className="flex items-center space-x-4 mb-4">
+                <span className="text-4xl font-bold text-primary">₹{product.price.toLocaleString()}</span>
+                {product.originalPrice && (
+                  <>
+                    <span className="text-xl text-muted-foreground line-through">₹{product.originalPrice.toLocaleString()}</span>
+                    <Badge variant="destructive">Save ₹{(product.originalPrice - product.price).toLocaleString()}</Badge>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center space-x-2 mb-6">
+                <div className="flex">
+                  {[...Array(5)].map((_, i) => (
+                    <Star 
+                      key={i} 
+                      className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`} 
+                    />
+                  ))}
+                </div>
+                <span className="text-muted-foreground">
+                  ({(product.rating || 0).toFixed(1)} from {product.reviews || 0} reviews)
+                </span>
+              </div>
+              <p className="text-muted-foreground text-lg mb-6">{product.description}</p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-center space-x-4">
+                <label className="text-sm font-medium">Quantity:</label>
+                <div className="flex items-center border rounded-lg">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Input 
+                    type="number" 
+                    value={quantity} 
+                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} 
+                    className="w-16 text-center border-0" 
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setQuantity(q => q + 1)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  onClick={handleAddToCart} 
+                  className="flex-1 gradient-primary text-primary-foreground py-3" 
+                  size="lg"
+                >
+                  <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+                </Button>
+                <Button 
+                  onClick={handleBuyNow} 
+                  className="flex-1 gradient-gold text-accent-foreground py-3" 
+                  size="lg"
+                >
+                  <Zap className="mr-2 h-5 w-5" /> Buy Now
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 pt-6 border-t">
+              <div className="text-center">
+                <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Free Shipping</p>
+              </div>
+              <div className="text-center">
+                <RotateCcw className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">30-Day Returns</p>
+              </div>
+              <div className="text-center">
+                <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Secure Payment</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <CheckoutModal
-          isOpen={isCheckoutOpen}
-          onClose={() => setIsCheckoutOpen(false)}
-          product={product}
-          quantity={quantity}
-          affiliateId={affiliateId}
-          customerId={customerId}
-          uid={uid}
-        />
+        <Tabs defaultValue="features" className="mb-16">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="features">Features</TabsTrigger>
+            <TabsTrigger value="specifications">Specifications</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          </TabsList>
+          <TabsContent value="features" className="mt-8">
+            <div className="bg-muted rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">Product Features</h3>
+              <ul className="space-y-3">
+                {product.features?.length > 0 ? product.features.map((f: string, i: number) => (
+                  <li key={i} className="flex items-center space-x-3">
+                    <Check className="h-5 w-5 text-primary" />
+                    <span>{f}</span>
+                  </li>
+                )) : <li className="text-muted-foreground">No features available</li>}
+              </ul>
+            </div>
+          </TabsContent>
+          <TabsContent value="specifications" className="mt-8">
+            <div className="bg-muted rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">Specifications</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p><strong>Category:</strong> {product.category}</p>
+                  <p><strong>Material:</strong> Swiss Premium Alloy</p>
+                  <p><strong>Finish:</strong> 24K Gold Plated</p>
+                </div>
+                <div>
+                  <p><strong>Weight:</strong> Lightweight</p>
+                  <p><strong>Care:</strong> Clean with soft cloth</p>
+                  <p><strong>Warranty:</strong> Lifetime</p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+          <TabsContent value="reviews" className="mt-8">
+            <div className="bg-muted rounded-lg p-6 text-center py-8">
+              <div className="text-4xl mb-2">{(product.rating || 0).toFixed(1)}</div>
+              <div className="flex justify-center mb-2">
+                {[...Array(5)].map((_, i) => (
+                  <Star 
+                    key={i} 
+                    className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`} 
+                  />
+                ))}
+              </div>
+              <p className="text-muted-foreground">Based on {product.reviews || 0} reviews</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {relatedProducts.length > 0 && (
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold mb-8">Related Products</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {relatedProducts.map(p => (
+                <ProductCard key={p._id} product={p} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-gradient-to-r from-primary to-yellow-700 rounded-2xl p-8 text-white text-center mt-16">
+          <h3 className="text-2xl font-bold mb-4">Interested in Earning?</h3>
+          <p className="mb-6 max-w-2xl mx-auto">Join our affiliate program and earn commissions on every sale!</p>
+          <Link href="/affiliate">
+            <Button variant="outline" className="border-white hover:bg-white text-primary">
+              Learn More
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        product={product}
+        quantity={quantity}
+        affiliateId={affiliateId}
+        customerId={customerId}
+        uid={uid}
+      />
     </div>
   );
+}
+
+// Add Razorpay type declaration
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
 }
