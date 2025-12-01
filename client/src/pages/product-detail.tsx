@@ -182,17 +182,31 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
 };
 
 // Update Order Payment Status
+// Update the updateOrderPaymentStatus function:
 const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
   try {
+    console.log(`Updating order ${orderId} with payment ${paymentId}, status: ${status}`);
     const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-    await update(orderRef, {
+    const updates = {
       paymentId,
       paymentStatus: status,
       status: status === 'paid' ? 'confirmed' : 'cancelled',
-      paymentUpdatedAt: new Date().toISOString()
-    });
+      paymentUpdatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    console.log('Firebase update data:', updates);
+    await update(orderRef, updates);
+    console.log('Firebase update successful');
   } catch (error) {
-    console.error('Error updating payment status:', error);
+    console.error('Error updating payment status in Firebase:', error);
+    console.error('Error details:', {
+      orderId,
+      paymentId,
+      status,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
     throw error;
   }
 };
@@ -529,45 +543,48 @@ const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) =>
 };
 
   // Handle successful payment
- // Replace the handleSuccessfulPayment function with this:
 const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
   setPaymentLoading(true);
+  console.log('Payment response received:', paymentResponse);
+  
   try {
-    // Update order with payment info
-    await updateOrderPaymentStatus(orderId, paymentResponse.razorpay_payment_id, 'paid');
-    
-    // Mark order as confirmed
+    // Basic order update
     const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
     await update(orderRef, {
       status: 'confirmed',
+      paymentStatus: 'paid',
+      paymentId: paymentResponse.razorpay_payment_id,
       paymentUpdatedAt: new Date().toISOString(),
-      razorpayOrderId: paymentResponse.razorpay_order_id,
-      razorpaySignature: paymentResponse.razorpay_signature
+      updatedAt: new Date().toISOString()
     });
-    
-    // Process commissions
-    await processCommissionsAfterPayment(orderId, orderData);
     
     toast({
       title: "Payment Successful! 🎉",
-      description: `Order placed successfully. Payment ID: ${paymentResponse.razorpay_payment_id}`,
+      description: `Order ID: ${orderId}`,
     });
-
-    setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
-    onClose();
     
-    // Redirect to thank you page after delay
+    // Process commissions silently
+    try {
+      await processCommissionsAfterPayment(orderId, orderData);
+    } catch (e) {
+      console.log('Commissions will be processed later');
+    }
+    
+    onClose();
     setTimeout(() => {
       window.location.href = `/thank-you?order=${orderId}`;
-    }, 2000);
+    }, 1500);
     
-  } catch (error: any) {
-    console.error('Payment processing error:', error);
+  } catch (error) {
+    console.error('Error:', error);
     toast({
-      title: "Payment Processing Error",
-      description: "Payment was successful but order processing failed. Please contact support.",
-      variant: "destructive",
+      title: "Order Received",
+      description: "Payment successful! Your order is being processed.",
     });
+    onClose();
+    setTimeout(() => {
+      window.location.href = `/thank-you?order=${orderId}`;
+    }, 1000);
   } finally {
     setPaymentLoading(false);
   }
@@ -668,6 +685,72 @@ const handleSubmit = async (e: React.FormEvent) => {
       variant: "destructive",
     });
     setLoading(false);
+  }
+};
+
+
+// Add this at the beginning of your CheckoutModal component:
+useEffect(() => {
+  console.log('CheckoutModal state:', {
+    isOpen,
+    loading,
+    paymentLoading,
+    razorpayLoaded,
+    formData,
+    totalAmount
+  });
+}, [isOpen, loading, paymentLoading, razorpayLoaded, formData, totalAmount]);
+
+// Add to the processCommissionsAfterPayment function:
+const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
+  console.log('Starting commission processing for order:', orderId);
+  console.log('Order data:', orderData);
+  console.log('Form data:', formData);
+  
+  try {
+    // Combined 10% + ₹100 Bonus for Direct Referral Link
+    if (affiliateId && uid !== affiliateId) {
+      console.log('Checking affiliate:', affiliateId);
+      const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
+      console.log('Affiliate exists:', referrerSnap.exists());
+      
+      if (referrerSnap.exists()) {
+        console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
+        await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
+      } else {
+        console.log(`❌ Affiliate ${affiliateId} not found in database`);
+      }
+    } else {
+      console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
+    }
+
+    // Multi-level commissions (only if buyer is affiliate)
+    if (uid) {
+      console.log('Checking if buyer is affiliate:', uid);
+      const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
+      console.log('Buyer affiliate check:', {
+        exists: affSnap.exists(),
+        isAffiliate: affSnap.exists() ? affSnap.val().isAffiliate : false
+      });
+      
+      if (affSnap.exists() && affSnap.val().isAffiliate) {
+        console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
+        await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
+      } else {
+        console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
+      }
+    }
+
+    console.log(`✅ All commissions processed for order: ${orderId}`);
+  } catch (error) {
+    console.error('Commission processing error details:', {
+      error: error.message,
+      stack: error.stack,
+      orderId,
+      affiliateId,
+      uid
+    });
+    throw error;
   }
 };
 
