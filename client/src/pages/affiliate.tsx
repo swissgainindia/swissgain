@@ -251,7 +251,7 @@ export default function Affiliate() {
 
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 99900, // ₹999 in paise
+      amount: 100, // ₹999 in paise
       currency: 'INR',
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
@@ -321,7 +321,7 @@ export default function Affiliate() {
           razorpay_payment_id: paymentResponse.razorpay_payment_id,
           razorpay_order_id: paymentResponse.razorpay_order_id,
           razorpay_signature: paymentResponse.razorpay_signature,
-          amount: 999,
+          amount: 1,
           currency: 'INR',
           status: 'completed',
           paid_at: new Date().toISOString(),
@@ -613,7 +613,7 @@ export default function Affiliate() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Affiliate Membership:</span>
-                      <span>₹999</span>
+                      <span>₹1</span>
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>One-time lifetime fee</span>
@@ -636,7 +636,7 @@ export default function Affiliate() {
                     Cancel
                   </Button>
                   <Button onClick={handlePayment} disabled={loading || !razorpayLoaded}>
-                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹999'}
+                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹1'}
                   </Button>
                 </div>
               </CardContent>
@@ -732,7 +732,7 @@ export default function Affiliate() {
                       <p className="text-sm font-medium text-white/90">Product Price</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#d97706]/50 shadow-sm">
-                      <div className="text-3xl font-bold text-white mb-1">₹999</div>
+                      <div className="text-3xl font-bold text-white mb-1">₹1</div>
                       <p className="text-sm font-medium text-white/90">Membership Fee</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#b45309]/50 shadow-sm">
@@ -776,7 +776,7 @@ export default function Affiliate() {
                     </h4>
                     <p className="text-sm text-muted-foreground">
                       As a Starter rank affiliate, you earn ₹100 per sale. With just 10 sales,
-                      you recover your ₹999 membership fee and start making profit!
+                      you recover your ₹1 membership fee and start making profit!
                     </p>
                   </div>
                 </div>
@@ -793,7 +793,7 @@ export default function Affiliate() {
               </div>
               <CardTitle className="text-2xl font-bold text-foreground mb-2">Affiliate Membership</CardTitle>
               <div className="text-4xl font-bold text-primary mb-2">
-                ₹999<span className="text-lg font-normal text-muted-foreground">/ lifetime</span>
+                ₹1<span className="text-lg font-normal text-muted-foreground">/ lifetime</span>
               </div>
               <CardDescription>One-time membership fee with no recurring charges</CardDescription>
             </CardHeader>
