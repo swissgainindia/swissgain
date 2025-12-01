@@ -182,7 +182,6 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
 };
 
 // Update Order Payment Status
-// Update the updateOrderPaymentStatus function:
 const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
   try {
     console.log(`Updating order ${orderId} with payment ${paymentId}, status: ${status}`);
@@ -445,6 +444,17 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   const totalAmount = product.price * quantity;
 
   useEffect(() => {
+    console.log('CheckoutModal state:', {
+      isOpen,
+      loading,
+      paymentLoading,
+      razorpayLoaded,
+      formData,
+      totalAmount
+    });
+  }, [isOpen, loading, paymentLoading, razorpayLoaded, formData, totalAmount]);
+
+  useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
       
@@ -470,132 +480,138 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Initiate Razorpay Payment
- // Replace the initiateRazorpayPayment function with this:
-const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) => {
-  if (!razorpayLoaded) {
-    toast({
-      title: 'Payment Error',
-      description: 'Payment system is loading. Please try again in a moment.',
-      variant: 'destructive',
-    });
-    return false;
-  }
+  const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) => {
+    if (!razorpayLoaded) {
+      toast({
+        title: 'Payment Error',
+        description: 'Payment system is loading. Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return false;
+    }
 
-  if (!window.Razorpay) {
-    toast({
-      title: 'Payment Error',
-      description: 'Razorpay not available. Please refresh the page.',
-      variant: 'destructive',
-    });
-    return false;
-  }
+    if (!window.Razorpay) {
+      toast({
+        title: 'Payment Error',
+        description: 'Razorpay not available. Please refresh the page.',
+        variant: 'destructive',
+      });
+      return false;
+    }
 
-  const options = {
-    key: RAZORPAY_CONFIG.key_id,
-    amount: totalAmount * 100, // Convert to paise
-    currency: 'INR',
-    name: 'SwissGain',
-    description: `Purchase: ${product.name}`,
-    image: '/logo.png',
-    handler: async function (response: any) {
-      console.log('Payment successful:', response);
-      await handleSuccessfulPayment(response, orderData, orderId);
-    },
-    prefill: {
-      name: formData.name,
-      email: formData.email,
-      contact: formData.phone,
-    },
-    notes: {
-      address: formData.address,
-      order_id: orderId,
-      product_id: product._id,
-      customer_id: customerId,
-      affiliate_id: affiliateId || 'none'
-    },
-    theme: {
-      color: '#b45309',
-    },
-    modal: {
-      ondismiss: function() {
-        toast({
-          title: 'Payment Cancelled',
-          description: 'You cancelled the payment process.',
-          variant: 'default',
-        });
+    const options = {
+      key: RAZORPAY_CONFIG.key_id,
+      amount: totalAmount * 100, // Convert to paise
+      currency: 'INR',
+      name: 'SwissGain',
+      description: `Purchase: ${product.name}`,
+      image: '/logo.png',
+      handler: async function (response: any) {
+        console.log('Payment successful:', response);
+        await handleSuccessfulPayment(response, orderData, orderId);
+      },
+      prefill: {
+        name: formData.name,
+        email: formData.email,
+        contact: formData.phone,
+      },
+      notes: {
+        address: formData.address,
+        order_id: orderId,
+        product_id: product._id,
+        customer_id: customerId,
+        affiliate_id: affiliateId || 'none'
+      },
+      theme: {
+        color: '#b45309',
+      },
+      modal: {
+        ondismiss: function() {
+          toast({
+            title: 'Payment Cancelled',
+            description: 'You cancelled the payment process.',
+            variant: 'default',
+          });
+        }
       }
+    };
+
+    try {
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.open();
+      return true;
+    } catch (error) {
+      console.error('Razorpay initialization error:', error);
+      toast({
+        title: 'Payment Error',
+        description: 'Failed to initialize payment. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
     }
   };
 
-  try {
-    const razorpayInstance = new window.Razorpay(options);
-    razorpayInstance.open();
-    return true;
-  } catch (error) {
-    console.error('Razorpay initialization error:', error);
-    toast({
-      title: 'Payment Error',
-      description: 'Failed to initialize payment. Please try again.',
-      variant: 'destructive',
-    });
-    return false;
-  }
-};
-
   // Handle successful payment
-const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
-  setPaymentLoading(true);
-  console.log('Payment response received:', paymentResponse);
-  
-  try {
-    // Basic order update
-    const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-    await update(orderRef, {
-      status: 'confirmed',
-      paymentStatus: 'paid',
-      paymentId: paymentResponse.razorpay_payment_id,
-      paymentUpdatedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+  const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
+    setPaymentLoading(true);
+    console.log('Payment response received:', paymentResponse);
     
-    toast({
-      title: "Payment Successful! 🎉",
-      description: `Order ID: ${orderId}`,
-    });
-    
-    // Process commissions silently
     try {
-      await processCommissionsAfterPayment(orderId, orderData);
-    } catch (e) {
-      console.log('Commissions will be processed later');
+      // Basic order update
+      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+      await update(orderRef, {
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        paymentId: paymentResponse.razorpay_payment_id,
+        paymentUpdatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      toast({
+        title: "Payment Successful! 🎉",
+        description: `Order ID: ${orderId}`,
+      });
+      
+      // Process commissions silently
+      try {
+        await processCommissionsAfterPayment(orderId, orderData);
+      } catch (e) {
+        console.log('Commissions will be processed later');
+      }
+      
+      onClose();
+      setTimeout(() => {
+        window.location.href = `/thank-you?order=${orderId}`;
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Order Received",
+        description: "Payment successful! Your order is being processed.",
+      });
+      onClose();
+      setTimeout(() => {
+        window.location.href = `/thank-you?order=${orderId}`;
+      }, 1000);
+    } finally {
+      setPaymentLoading(false);
     }
-    
-    onClose();
-    setTimeout(() => {
-      window.location.href = `/thank-you?order=${orderId}`;
-    }, 1500);
-    
-  } catch (error) {
-    console.error('Error:', error);
-    toast({
-      title: "Order Received",
-      description: "Payment successful! Your order is being processed.",
-    });
-    onClose();
-    setTimeout(() => {
-      window.location.href = `/thank-you?order=${orderId}`;
-    }, 1000);
-  } finally {
-    setPaymentLoading(false);
-  }
-};
+  };
 
   // Process commissions after payment
   const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
+    console.log('Starting commission processing for order:', orderId);
+    console.log('Order data:', orderData);
+    console.log('Form data:', formData);
+    
     try {
       // Combined 10% + ₹100 Bonus for Direct Referral Link
       if (affiliateId && uid !== affiliateId) {
+        console.log('Checking affiliate:', affiliateId);
         const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
+        console.log('Affiliate exists:', referrerSnap.exists());
+        
         if (referrerSnap.exists()) {
           console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
           await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
@@ -608,7 +624,13 @@ const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderDat
 
       // Multi-level commissions (only if buyer is affiliate)
       if (uid) {
+        console.log('Checking if buyer is affiliate:', uid);
         const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
+        console.log('Buyer affiliate check:', {
+          exists: affSnap.exists(),
+          isAffiliate: affSnap.exists() ? affSnap.val().isAffiliate : false
+        });
+        
         if (affSnap.exists() && affSnap.val().isAffiliate) {
           console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
           await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
@@ -619,140 +641,79 @@ const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderDat
 
       console.log(`✅ All commissions processed for order: ${orderId}`);
     } catch (error) {
-      console.error('Commission processing error:', error);
+      console.error('Commission processing error details:', {
+        error: error.message,
+        stack: error.stack,
+        orderId,
+        affiliateId,
+        uid
+      });
       throw error;
     }
   };
 
- // Replace the handleSubmit function with this:
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
-    toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
-    return;
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
+      toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
+      return;
+    }
 
-  setLoading(true);
-  try {
-    const purchaseCustomerId = generatePurchaseCustomerId();
-    const orderData: OrderData = {
-      productId: product._id,
-      ...(affiliateId && { affiliateId }),
-      customerId: purchaseCustomerId,
-      originalCustomerId: customerId,
-      productName: product.name,
-      price: product.price,
-      originalPrice: product.originalPrice,
-      quantity,
-      totalAmount,
-      customerInfo: formData,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      images: product.images,
-      category: product.category,
-      discount: product.discount,
-      productDescription: product.description,
-      productFeatures: product.features,
-      productBrand: product.brand || 'SwissGain',
-      productRating: product.rating,
-      productReviews: product.reviews,
-      paymentMethod: 'razorpay',
-      paymentStatus: 'pending'
-    };
+    setLoading(true);
+    try {
+      const purchaseCustomerId = generatePurchaseCustomerId();
+      const orderData: OrderData = {
+        productId: product._id,
+        ...(affiliateId && { affiliateId }),
+        customerId: purchaseCustomerId,
+        originalCustomerId: customerId,
+        productName: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        quantity,
+        totalAmount,
+        customerInfo: formData,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        images: product.images,
+        category: product.category,
+        discount: product.discount,
+        productDescription: product.description,
+        productFeatures: product.features,
+        productBrand: product.brand || 'SwissGain',
+        productRating: product.rating,
+        productReviews: product.reviews,
+        paymentMethod: 'razorpay',
+        paymentStatus: 'pending'
+      };
 
-    const orderId = await saveOrderToFirebase(orderData);
-    console.log(`✅ Order saved: ${orderId}`);
+      const orderId = await saveOrderToFirebase(orderData);
+      console.log(`✅ Order saved: ${orderId}`);
 
-    // Update order with pending payment status
-    const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-    await update(orderRef, {
-      uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString()
-    });
+      // Update order with pending payment status
+      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+      await update(orderRef, {
+        uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString()
+      });
 
-    // Initiate Razorpay payment
-    const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
-    
-    if (!paymentInitiated) {
+      // Initiate Razorpay payment
+      const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
+      
+      if (!paymentInitiated) {
+        setLoading(false);
+      }
+
+    } catch (error: any) {
+      console.error('❌ Order placement error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to place order.",
+        variant: "destructive",
+      });
       setLoading(false);
     }
-
-  } catch (error: any) {
-    console.error('❌ Order placement error:', error);
-    toast({
-      title: "Error",
-      description: error.message || "Failed to place order.",
-      variant: "destructive",
-    });
-    setLoading(false);
-  }
-};
-
-
-// Add this at the beginning of your CheckoutModal component:
-useEffect(() => {
-  console.log('CheckoutModal state:', {
-    isOpen,
-    loading,
-    paymentLoading,
-    razorpayLoaded,
-    formData,
-    totalAmount
-  });
-}, [isOpen, loading, paymentLoading, razorpayLoaded, formData, totalAmount]);
-
-// Add to the processCommissionsAfterPayment function:
-const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
-  console.log('Starting commission processing for order:', orderId);
-  console.log('Order data:', orderData);
-  console.log('Form data:', formData);
-  
-  try {
-    // Combined 10% + ₹100 Bonus for Direct Referral Link
-    if (affiliateId && uid !== affiliateId) {
-      console.log('Checking affiliate:', affiliateId);
-      const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
-      console.log('Affiliate exists:', referrerSnap.exists());
-      
-      if (referrerSnap.exists()) {
-        console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
-        await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
-      } else {
-        console.log(`❌ Affiliate ${affiliateId} not found in database`);
-      }
-    } else {
-      console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
-    }
-
-    // Multi-level commissions (only if buyer is affiliate)
-    if (uid) {
-      console.log('Checking if buyer is affiliate:', uid);
-      const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
-      console.log('Buyer affiliate check:', {
-        exists: affSnap.exists(),
-        isAffiliate: affSnap.exists() ? affSnap.val().isAffiliate : false
-      });
-      
-      if (affSnap.exists() && affSnap.val().isAffiliate) {
-        console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
-        await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
-      } else {
-        console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
-      }
-    }
-
-    console.log(`✅ All commissions processed for order: ${orderId}`);
-  } catch (error) {
-    console.error('Commission processing error details:', {
-      error: error.message,
-      stack: error.stack,
-      orderId,
-      affiliateId,
-      uid
-    });
-    throw error;
-  }
-};
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -846,37 +807,35 @@ const processCommissionsAfterPayment = async (orderId: string, orderData: OrderD
               <Input name="pincode" value={formData.pincode} onChange={handleInputChange} required placeholder="6-digit PIN" />
             </div>
             
-            {/* Replace the payment info section with this: */}
-<div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
-  <div className="flex items-center gap-2 mb-2">
-    <Shield className="h-4 w-4 text-primary" />
-    <span className="text-sm font-medium">Secure Payment by Razorpay</span>
-  </div>
-  <p className="text-xs text-muted-foreground">
-    Your payment information is encrypted and secure. We never store your card details.
-  </p>
-  <div className="mt-2 flex items-center justify-between text-xs">
-    <span className="text-muted-foreground">Payment Methods:</span>
-    <div className="flex items-center gap-1">
-      <span className="bg-white px-2 py-1 rounded border">Credit Card</span>
-      <span className="bg-white px-2 py-1 rounded border">Debit Card</span>
-      <span className="bg-white px-2 py-1 rounded border">UPI</span>
-      <span className="bg-white px-2 py-1 rounded border">Net Banking</span>
-    </div>
-  </div>
-</div>
+            <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Secure Payment by Razorpay</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your payment information is encrypted and secure. We never store your card details.
+              </p>
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Payment Methods:</span>
+                <div className="flex items-center gap-1">
+                  <span className="bg-white px-2 py-1 rounded border">Credit Card</span>
+                  <span className="bg-white px-2 py-1 rounded border">Debit Card</span>
+                  <span className="bg-white px-2 py-1 rounded border">UPI</span>
+                  <span className="bg-white px-2 py-1 rounded border">Net Banking</span>
+                </div>
+              </div>
+            </div>
 
-{/* Update the submit button with this: */}
-<Button 
-  type="submit" 
-  className="w-full gradient-primary text-primary-foreground py-3" 
-  disabled={loading || paymentLoading || !razorpayLoaded}
->
-  {paymentLoading ? 'Processing Payment...' : 
-   loading ? 'Creating Order...' : 
-   !razorpayLoaded ? 'Loading Payment...' : 
-   `Pay Securely ₹${totalAmount.toLocaleString()}`}
-</Button>
+            <Button 
+              type="submit" 
+              className="w-full gradient-primary text-primary-foreground py-3" 
+              disabled={loading || paymentLoading || !razorpayLoaded}
+            >
+              {paymentLoading ? 'Processing Payment...' : 
+               loading ? 'Creating Order...' : 
+               !razorpayLoaded ? 'Loading Payment...' : 
+               `Pay Securely ₹${totalAmount.toLocaleString()}`}
+            </Button>
           </form>
 
           <div className="text-center text-xs text-gray-500">
