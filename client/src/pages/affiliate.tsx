@@ -183,7 +183,7 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 1
+        purchaseAmount: 1  // Changed from 999 to 1
       };
      
       await set(newRef, referralData);
@@ -251,7 +251,7 @@ export default function Affiliate() {
 
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 100, // ₹1 in paise
+      amount: 100, // ₹1 in paise (changed from 99900)
       currency: 'INR',
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
@@ -302,9 +302,11 @@ export default function Affiliate() {
   const completeRegistrationAfterPayment = async (paymentResponse: any) => {
     setLoading(true);
     try {
+      // Get referral code from URL if exists
       const urlParams = new URLSearchParams(window.location.search);
       const refCode = urlParams.get('ref');
      
+      // Save new affiliate (simplified like the working version)
       const userRef = ref(database, `affiliates/${userId}`);
       const referralCode = generateReferralCode(userDetails.name, userId);
      
@@ -317,23 +319,16 @@ export default function Affiliate() {
         joinDate: new Date().toISOString(),
         referralCode: referralCode,
         referralLink: `${window.location.origin}/affiliate?ref=${referralCode}`,
-        payment: {
-          razorpay_payment_id: paymentResponse.razorpay_payment_id,
-          razorpay_order_id: paymentResponse.razorpay_order_id,
-          razorpay_signature: paymentResponse.razorpay_signature,
-          amount: 1,
-          currency: 'INR',
-          status: 'completed',
-          paid_at: new Date().toISOString(),
-        },
+        // Keep it simple like the working version - no payment object
         ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
       };
-
+      
       await set(userRef, userData);
-
+      
       // Login the user immediately after registration
       login(userData);
-
+      
+      // Track referral if refCode exists and referrerId is found
       if (refCode && referrerId) {
         await trackReferral(userId, referrerId, userDetails);
         toast({
@@ -341,7 +336,7 @@ export default function Affiliate() {
           description: `You were referred by ${referrerName}. They will be notified.`,
         });
       }
-
+      
       setShowPayment(false);
       setUserDetails({ name: '', email: '', phone: '' });
      
@@ -349,11 +344,11 @@ export default function Affiliate() {
         title: 'Payment Successful! 🎉',
         description: 'Welcome to SwissGain Affiliate Program! Redirecting to dashboard...',
       });
-
+      
+      // Redirect to dashboard after a delay
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 2000);
-
     } catch (error) {
       console.error('Registration error after payment:', error);
       toast({
@@ -612,14 +607,14 @@ export default function Affiliate() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Affiliate Membership:</span>
-                      <span>₹1</span>
+                      <span>₹1</span> {/* Changed from ₹999 to ₹1 */}
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>One-time lifetime fee</span>
                     </div>
                     <div className="flex justify-between font-semibold border-t pt-2">
                       <span>Total Amount:</span>
-                      <span>₹1</span>
+                      <span>₹1</span> {/* Changed from ₹999 to ₹1 */}
                     </div>
                   </div>
                 </div>
@@ -635,7 +630,7 @@ export default function Affiliate() {
                     Cancel
                   </Button>
                   <Button onClick={handlePayment} disabled={loading || !razorpayLoaded}>
-                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹1'}
+                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹1'} {/* Changed from ₹999 to ₹1 */}
                   </Button>
                 </div>
               </CardContent>
@@ -731,7 +726,7 @@ export default function Affiliate() {
                       <p className="text-sm font-medium text-white/90">Product Price</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#d97706]/50 shadow-sm">
-                      <div className="text-3xl font-bold text-white mb-1">₹1</div>
+                      <div className="text-3xl font-bold text-white mb-1">₹1</div> {/* Changed from ₹999 to ₹1 */}
                       <p className="text-sm font-medium text-white/90">Membership Fee</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#b45309]/50 shadow-sm">
@@ -775,7 +770,7 @@ export default function Affiliate() {
                     </h4>
                     <p className="text-sm text-muted-foreground">
                       As a Starter rank affiliate, you earn ₹100 per sale. With just 10 sales,
-                      you recover your ₹1 membership fee and start making profit!
+                      you recover your ₹1 membership fee and start making profit! {/* Changed from ₹999 to ₹1 */}
                     </p>
                   </div>
                 </div>
@@ -792,7 +787,7 @@ export default function Affiliate() {
               </div>
               <CardTitle className="text-2xl font-bold text-foreground mb-2">Affiliate Membership</CardTitle>
               <div className="text-4xl font-bold text-primary mb-2">
-                ₹1<span className="text-lg font-normal text-muted-foreground">/ lifetime</span>
+                ₹1<span className="text-lg font-normal text-muted-foreground">/ lifetime</span> {/* Changed from ₹999 to ₹1 */}
               </div>
               <CardDescription>One-time membership fee with no recurring charges</CardDescription>
             </CardHeader>
@@ -846,7 +841,7 @@ export default function Affiliate() {
               </div>
               <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                 <p className="text-xs text-green-700 text-center font-medium">
-                  <span className="font-bold">Break even with just 10 sales.</span> Start earning profit immediately after.
+                  <span className="font-bold">Break even with just 1 sale.</span> Start earning profit immediately after. {/* Changed from 10 sales to 1 sale */}
                 </p>
               </div>
             </CardContent>
