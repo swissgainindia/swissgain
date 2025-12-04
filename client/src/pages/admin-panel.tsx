@@ -444,13 +444,15 @@ export default function AdminPanel() {
   return (
     <>
       <div className="flex h-screen bg-gray-100">
-        {/* Sidebar */}
-        <aside className="w-64 bg-gray-900 text-white">
-          <div className="p-6 border-b border-gray-800">
+        {/* Sidebar with scrollbar */}
+        <aside className="w-64 bg-gray-900 text-white flex flex-col">
+          <div className="p-6 border-b border-gray-800 flex-shrink-0">
             <h1 className="text-2xl font-bold">SwissGain Admin</h1>
             {currentUser?.role === "superadmin" && <span className="text-xs bg-yellow-500 px-2 py-1 rounded">SUPER ADMIN</span>}
           </div>
-          <nav className="p-4 space-y-1">
+          
+          {/* Scrollable Navigation */}
+          <nav className="flex-1 overflow-y-auto p-4 space-y-1 sidebar-scroll">
             {allowedMenu.map(item => {
               const Icon = item.icon;
               return (
@@ -459,24 +461,26 @@ export default function AdminPanel() {
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${activeTab === item.id ? "bg-purple-600" : "hover:bg-gray-800"}`}
                 >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.label}</span>
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  <span className="truncate">{item.label}</span>
                 </button>
               );
             })}
           </nav>
-          <div className="p-4 border-t border-gray-800">
+          
+          {/* Fixed Footer */}
+          <div className="p-4 border-t border-gray-800 flex-shrink-0">
             <div 
               className="flex items-center gap-3 mb-4 p-2 rounded-lg hover:bg-gray-800 cursor-pointer transition"
               onClick={() => setShowChangeModal(true)}
             >
-              <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
                 <Settings className="h-5 w-5" />
               </div>
-              <div>
-                <p className="font-medium">{currentUser?.username}</p>
-                <p className="text-xs text-gray-400">{currentUser?.role}</p>
-                <p className="text-xs text-purple-400 mt-1">Click to change credentials</p>
+              <div className="min-w-0">
+                <p className="font-medium truncate">{currentUser?.username}</p>
+                <p className="text-xs text-gray-400 truncate">{currentUser?.role}</p>
+                <p className="text-xs text-purple-400 mt-1 truncate">Click to change credentials</p>
               </div>
             </div>
             <Button onClick={handleLogout} className="w-full bg-red-600 hover:bg-red-700">
