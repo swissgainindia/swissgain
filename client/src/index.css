@@ -335,7 +335,7 @@ body {
 
 @media (max-width: 480px) {
   .newsletter-container {
-    padding: 1.5rem;
+    padding: 1rem;
   }
   
   .subscribe-btn {

@@ -57,8 +57,8 @@ export default function AdminPanel() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [roleUsers, setRoleUsers] = useState<RoleUser[]>([]);
 
-  const SUPER_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || "admin";
-  const SUPER_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "admin123";
+  const SUPER_USERNAME = import.meta.env.VITE_ADMIN_USERNAME;
+  const SUPER_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 
   // Load all role-based users from Firebase
   useEffect(() => {
