@@ -336,6 +336,19 @@ body {
 @media (max-width: 480px) {
   .newsletter-container {
     padding: 1rem;
+    transform: scale(0.8);
+  }
+  
+  .subscribe-btn {
+    padding: 0.875rem 1.5rem;
+  }
+}
+
+@media (max-width: 330px) {
+  .newsletter-container {
+    padding: 1rem;
+    transform: scale(0.7);
+    margin-left: -35px;
   }
   
   .subscribe-btn {
