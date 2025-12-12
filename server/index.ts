@@ -36,14 +36,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Connect to MongoDB
   await connectDatabase();
-
-  // Serve uploaded images statically
-  app.use("/uploads", express.static("attached_assets/uploads"));
-
-  // Register all your API routes
-  const server = await registerRoutes(app);
+  await registerRoutes(app);
 
   // Error handler middleware
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -53,16 +47,18 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Setup Vite in development
   if (app.get("env") === "development") {
-    await setupVite(app, server);
+    await setupVite(app);
   } else {
     serveStatic(app);
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(
-    { port, host: "0.0.0.0", reusePort: true },
-    () => log(`Server running on port ${port}`)
-  );
+  app.listen(port, "0.0.0.0", () => log(`✅ Server running on port ${port}`));
 })();
+
+
+
+// const testApp = express();
+// testApp.get("/", (req, res) => res.send("✅ Express test running fine!"));
+// testApp.listen(5050, () => console.log("Test server on port 5050"));
