@@ -96,10 +96,35 @@ const checkEmailExists = async (email: string, excludeUid?: string): Promise<boo
   }
 };
 
+const checkUsernameExists = async (username: string, excludeUid?: string): Promise<boolean> => {
+  try {
+    const affiliatesRef = ref(database, 'affiliates');
+    const snap = await get(affiliatesRef);
+   
+    if (snap.exists()) {
+      const affiliates = snap.val();
+     
+      // Check if any affiliate has this username, excluding the current uid
+      for (const affiliateData of Object.values(affiliates)) {
+        const data = affiliateData as any;
+        if (data.username === username && data.uid !== excludeUid) {
+          return true;
+        }
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking username:', error);
+    return false;
+  }
+};
+
 interface UserDetails {
   name: string;
   email: string;
   phone: string;
+  username: string;
+  password: string;
 }
 
 interface Affiliate {
@@ -107,10 +132,13 @@ interface Affiliate {
   name: string;
   email: string;
   phone: string;
+  username: string;
+  password: string;
   isAffiliate: boolean;
   joinDate: string;
   referralCode: string;
   referralLink: string;
+  hasEditedReferral?: boolean;
 }
 
 const fetchAffiliates = async (setAffiliates: React.Dispatch<React.SetStateAction<Affiliate[]>>) => {
@@ -137,7 +165,7 @@ const fetchAffiliates = async (setAffiliates: React.Dispatch<React.SetStateActio
 
 const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = ({ onSuccess, onClose }) => {
   const { toast } = useToast();
-  const [userDetails, setUserDetails] = useState<UserDetails>({ name: '', email: '', phone: '' });
+  const [userDetails, setUserDetails] = useState<UserDetails>({ name: '', email: '', phone: '', username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -148,7 +176,7 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userDetails.name || !userDetails.email || !userDetails.phone) {
+    if (!userDetails.name || !userDetails.email || !userDetails.phone || !userDetails.username || !userDetails.password) {
       toast({
         title: 'Incomplete Details',
         description: 'Please fill all required fields.',
@@ -176,6 +204,24 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
       return;
     }
 
+    if (userDetails.username.length < 3) {
+      toast({
+        title: 'Invalid Username',
+        description: 'Username must be at least 3 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (userDetails.password.length < 6) {
+      toast({
+        title: 'Invalid Password',
+        description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -185,6 +231,17 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
         toast({
           title: 'Email Already Exists',
           description: 'An affiliate with this email already exists.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check if username already exists
+      const usernameExists = await checkUsernameExists(userDetails.username);
+      if (usernameExists) {
+        toast({
+          title: 'Username Already Exists',
+          description: 'An affiliate with this username already exists.',
           variant: 'destructive',
         });
         return;
@@ -201,6 +258,8 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
         name: userDetails.name,
         email: userDetails.email,
         phone: userDetails.phone,
+        username: userDetails.username,
+        password: userDetails.password,
         isAffiliate: true,
         joinDate: new Date().toISOString(),
         referralCode: referralCode,
@@ -212,7 +271,7 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
       await set(userRef, userData);
 
       // Reset form
-      setUserDetails({ name: '', email: '', phone: '' });
+      setUserDetails({ name: '', email: '', phone: '', username: '', password: '' });
       setUserId(null);
 
       toast({
@@ -285,6 +344,30 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
                 required
               />
             </div>
+            <div>
+              <Label htmlFor="username">Username *</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="Choose a unique username (min 3 chars)"
+                value={userDetails.username}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">Password *</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Create a password (min 6 chars)"
+                value={userDetails.password}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
           </div>
           <Button type="submit" className="w-full mt-6" disabled={loading}>
             {loading ? 'Adding...' : (
@@ -309,8 +392,21 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
 
 const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onClose: () => void }> = ({ affiliate, onSuccess, onClose }) => {
   const { toast } = useToast();
-  const [userDetails, setUserDetails] = useState<UserDetails>({ name: affiliate.name, email: affiliate.email, phone: affiliate.phone });
+  const [userDetails, setUserDetails] = useState<UserDetails>({ 
+    name: affiliate.name, 
+    email: affiliate.email, 
+    phone: affiliate.phone, 
+    username: affiliate.username, 
+    password: affiliate.password 
+  });
+  const [newReferralCode, setNewReferralCode] = useState(generateReferralCode(affiliate.name, affiliate.uid));
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!affiliate.hasEditedReferral) {
+      setNewReferralCode(generateReferralCode(userDetails.name, affiliate.uid));
+    }
+  }, [userDetails.name, affiliate.hasEditedReferral, affiliate.uid]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -319,7 +415,7 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userDetails.name || !userDetails.email || !userDetails.phone) {
+    if (!userDetails.name || !userDetails.email || !userDetails.phone || !userDetails.username || !userDetails.password) {
       toast({
         title: 'Incomplete Details',
         description: 'Please fill all required fields.',
@@ -347,6 +443,24 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
       return;
     }
 
+    if (userDetails.username.length < 3) {
+      toast({
+        title: 'Invalid Username',
+        description: 'Username must be at least 3 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (userDetails.password.length < 6) {
+      toast({
+        title: 'Invalid Password',
+        description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -361,17 +475,29 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
         return;
       }
 
-      // Generate new referral code if name changed
-      const newReferralCode = generateReferralCode(userDetails.name, affiliate.uid);
+      // Check if username already exists (exclude current uid)
+      const usernameExists = await checkUsernameExists(userDetails.username, affiliate.uid);
+      if (usernameExists) {
+        toast({
+          title: 'Username Already Exists',
+          description: 'An affiliate with this username already exists.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       // Prepare updated data
+      const finalReferralCode = affiliate.hasEditedReferral ? affiliate.referralCode : newReferralCode;
       const updatedData = {
         ...affiliate,
         name: userDetails.name,
         email: userDetails.email,
         phone: userDetails.phone,
-        referralCode: newReferralCode,
-        referralLink: `${window.location.origin}/affiliate?ref=${newReferralCode}`,
+        username: userDetails.username,
+        password: userDetails.password,
+        referralCode: finalReferralCode,
+        referralLink: `${window.location.origin}/affiliate?ref=${finalReferralCode}`,
+        hasEditedReferral: true,
       };
 
       // Update in Firebase
@@ -443,6 +569,55 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
               onChange={handleInputChange}
               required
             />
+          </div>
+          <div>
+            <Label htmlFor="username">Username *</Label>
+            <Input
+              id="username"
+              name="username"
+              type="text"
+              placeholder="Choose a unique username (min 3 chars)"
+              value={userDetails.username}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="password">Password *</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="Update password (min 6 chars)"
+              value={userDetails.password}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="referral">{affiliate.hasEditedReferral ? 'Referral Code' : 'Referral Code *'}</Label>
+            {affiliate.hasEditedReferral ? (
+              <Input
+                id="referral"
+                type="text"
+                value={affiliate.referralCode}
+                disabled
+              />
+            ) : (
+              <Input
+                id="referral"
+                type="text"
+                value={newReferralCode}
+                onChange={(e) => setNewReferralCode(e.target.value)}
+                placeholder="Enter or auto-generate referral code"
+                required
+              />
+            )}
+            {!affiliate.hasEditedReferral && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Edit once: This will be fixed after this update.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter className="mt-6">
@@ -562,6 +737,8 @@ const AdminAffiliates: React.FC = () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Password</TableHead>
                       <TableHead>Referral Code</TableHead>
                       <TableHead>Join Date</TableHead>
                       <TableHead>Actions</TableHead>
@@ -573,6 +750,8 @@ const AdminAffiliates: React.FC = () => {
                         <TableCell className="font-medium">{affiliate.name}</TableCell>
                         <TableCell>{affiliate.email}</TableCell>
                         <TableCell>{affiliate.phone}</TableCell>
+                        <TableCell>{affiliate.username}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-sm">{affiliate.password}</TableCell>
                         <TableCell className="font-mono text-sm">{affiliate.referralCode}</TableCell>
                         <TableCell>
                           {new Date(affiliate.joinDate).toLocaleDateString()}
