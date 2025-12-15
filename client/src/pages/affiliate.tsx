@@ -84,6 +84,7 @@ export default function Affiliate() {
   const [loading, setLoading] = useState(false);
   const [referrerName, setReferrerName] = useState('');
   const [referrerId, setReferrerId] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState<string>('');
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   /* ---------- Initialize User ID ---------- */
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function Affiliate() {
     const refCode = urlParams.get('ref');
   
     if (refCode) {
+      setReferralCode(refCode);
       fetchReferrer(refCode);
     }
   }, []);
@@ -123,12 +125,17 @@ export default function Affiliate() {
           if (data.referralCode === refCode) {
             setReferrerName(data.name);
             setReferrerId(affiliateId);
-            break;
+            return;
           }
         }
       }
+      // If no match, clear states
+      setReferrerName('');
+      setReferrerId(null);
     } catch (error) {
       console.error('Error fetching referrer:', error);
+      setReferrerName('');
+      setReferrerId(null);
     }
   };
   /* ---------- Check if email exists ---------- */
@@ -309,13 +316,12 @@ export default function Affiliate() {
   const completeRegistrationAfterPayment = async (paymentResponse: any) => {
     setLoading(true);
     try {
-      // Get referral code from URL if exists
-      const urlParams = new URLSearchParams(window.location.search);
-      const refCode = urlParams.get('ref');
+      // Use the referral code from state (auto-filled or manual)
+      const refCode = referralCode;
     
       // Save new affiliate (simplified like the working version)
       const userRef = ref(database, `affiliates/${userId}`);
-      const referralCode = generateReferralCode(userDetails.name, userId);
+      const generatedReferralCode = generateReferralCode(userDetails.name, userId);
     
       const userData = {
         uid: userId,
@@ -326,8 +332,8 @@ export default function Affiliate() {
         password: userDetails.password,
         isAffiliate: true,
         joinDate: new Date().toISOString(),
-        referralCode: referralCode,
-        referralLink: `${window.location.origin}/affiliate?ref=${referralCode}`,
+        referralCode: generatedReferralCode,
+        referralLink: `${window.location.origin}/affiliate?ref=${generatedReferralCode}`,
         // Keep it simple like the working version - no payment object
         ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
       };
@@ -348,6 +354,7 @@ export default function Affiliate() {
      
       setShowPayment(false);
       setUserDetails({ name: '', email: '', phone: '', username: '', password: '' });
+      setReferralCode('');
     
       toast({
         title: 'Payment Successful! 🎉',
@@ -374,7 +381,7 @@ export default function Affiliate() {
     if (!userDetails.name || !userDetails.email || !userDetails.phone || !userDetails.username || !userDetails.password) {
       toast({
         title: 'Incomplete Details',
-        description: 'Please fill all fields.',
+        description: 'Please fill all required fields.',
         variant: 'destructive',
       });
       return;
@@ -446,6 +453,21 @@ export default function Affiliate() {
         setLoading(false);
         return;
       }
+
+      // Validate referral code if provided and not already validated
+      if (referralCode && !referrerId) {
+        await fetchReferrer(referralCode);
+        if (!referrerId) {
+          toast({
+            title: 'Invalid Referral Code',
+            description: 'The entered referral code is not valid. You can proceed without it.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      
       const paymentInitiated = await initiateRazorpayPayment();
      
       if (!paymentInitiated) {
@@ -532,6 +554,9 @@ export default function Affiliate() {
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setLoginCreds((prev) => ({ ...prev, [name]: value }));
+  };
+  const handleReferralChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setReferralCode(e.target.value);
   };
   /* ---------- Rank data (static) ---------- */
   const rankData = [
@@ -620,6 +645,19 @@ export default function Affiliate() {
                       onChange={handleInputChange}
                       required
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="reg-referral">Referral Code (Optional)</Label>
+                    <Input
+                      id="reg-referral"
+                      type="text"
+                      placeholder="Enter referral code if you have one"
+                      value={referralCode}
+                      onChange={handleReferralChange}
+                    />
+                    {referrerName && (
+                      <p className="text-xs text-green-600 mt-1">Valid! Referred by {referrerName}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="reg-username">Username *</Label>
