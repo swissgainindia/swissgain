@@ -1051,10 +1051,10 @@ export default function ProductDetail() {
                 <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Free Shipping</p>
               </div>
-              <div className="text-center">
+              {/* <div className="text-center">
                 <RotateCcw className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">30-Day Returns</p>
-              </div>
+              </div> */}
               <div className="text-center">
                 <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Secure Payment</p>
@@ -1094,7 +1094,7 @@ export default function ProductDetail() {
                 <div>
                   <p><strong>Weight:</strong> Lightweight</p>
                   <p><strong>Care:</strong> Clean with soft cloth</p>
-                  <p><strong>Warranty:</strong> Lifetime</p>
+                  {/* <p><strong>Warranty:</strong> Lifetime</p> */}
                 </div>
               </div>
             </div>

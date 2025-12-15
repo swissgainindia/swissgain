@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Eye, Search, Filter, Download } from "lucide-react";
+import { Eye, Search, Filter, Download, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // ADD THIS IMPORT
 
 // Firebase imports
 import { initializeApp, getApps } from 'firebase/app';
-import { getDatabase, ref, onValue, update } from 'firebase/database';
+import { getDatabase, ref, onValue, update, remove } from 'firebase/database';
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -170,6 +170,32 @@ export default function AdminOrders() {
       toast({
         title: "Error",
         description: "Failed to update order status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (orderId: string) => {
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
+      await remove(orderRef);
+      
+      toast({
+        title: "Success",
+        description: "Order deleted successfully",
+      });
+      
+      // Update local state
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order",
         variant: "destructive",
       });
     }
@@ -486,6 +512,13 @@ export default function AdminOrders() {
                             onClick={() => setSelectedOrder(order)}
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(order.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

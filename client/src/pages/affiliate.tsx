@@ -70,6 +70,8 @@ const getCookie = (name: string) => {
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? m[2] : null;
 };
+
+console.log('this is my update file');
 export default function Affiliate() {
   const { toast } = useToast();
   const { isLoggedIn, userData, isAffiliate, login, checkAuth } = useAuth();
