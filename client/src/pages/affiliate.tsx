@@ -258,7 +258,7 @@ export default function Affiliate() {
     }
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 99900, // ₹999 in paise (changed from 99900)
+      amount: 10, // ₹999 in paise (changed from 99900)
       currency: 'INR',
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
