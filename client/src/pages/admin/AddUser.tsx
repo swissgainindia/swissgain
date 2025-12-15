@@ -119,6 +119,29 @@ const checkUsernameExists = async (username: string, excludeUid?: string): Promi
   }
 };
 
+const checkReferralCodeExists = async (code: string, excludeUid?: string): Promise<boolean> => {
+  try {
+    const affiliatesRef = ref(database, 'affiliates');
+    const snap = await get(affiliatesRef);
+   
+    if (snap.exists()) {
+      const affiliates = snap.val();
+     
+      // Check if any affiliate has this referral code, excluding the current uid
+      for (const affiliateData of Object.values(affiliates)) {
+        const data = affiliateData as any;
+        if (data.referralCode === code && data.uid !== excludeUid) {
+          return true;
+        }
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking referral code:', error);
+    return false;
+  }
+};
+
 interface UserDetails {
   name: string;
   email: string;
@@ -166,6 +189,8 @@ const fetchAffiliates = async (setAffiliates: React.Dispatch<React.SetStateActio
 const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = ({ onSuccess, onClose }) => {
   const { toast } = useToast();
   const [userDetails, setUserDetails] = useState<UserDetails>({ name: '', email: '', phone: '', username: '', password: '' });
+  const [manualReferral, setManualReferral] = useState(false);
+  const [customReferralCode, setCustomReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -222,6 +247,33 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
       return;
     }
 
+    let referralCode: string;
+    let hasEditedReferral: boolean = false;
+
+    if (manualReferral) {
+      if (customReferralCode.length < 6) {
+        toast({
+          title: 'Invalid Referral Code',
+          description: 'Referral code must be at least 6 characters.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const codeExists = await checkReferralCodeExists(customReferralCode);
+      if (codeExists) {
+        toast({
+          title: 'Referral Code Already Exists',
+          description: 'This referral code is already in use.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      referralCode = customReferralCode;
+      hasEditedReferral = true;
+    } else {
+      referralCode = '';
+    }
+
     setLoading(true);
 
     try {
@@ -247,10 +299,13 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
         return;
       }
 
-      // Generate user ID and referral code
+      // Generate user ID
       const uid = generateUserId();
       setUserId(uid);
-      const referralCode = generateReferralCode(userDetails.name, uid);
+
+      if (!manualReferral) {
+        referralCode = generateReferralCode(userDetails.name, uid);
+      }
 
       // Prepare user data
       const userData = {
@@ -264,6 +319,7 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
         joinDate: new Date().toISOString(),
         referralCode: referralCode,
         referralLink: `${window.location.origin}/affiliate?ref=${referralCode}`,
+        hasEditedReferral: hasEditedReferral,
       };
 
       // Save to Firebase
@@ -272,6 +328,8 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
 
       // Reset form
       setUserDetails({ name: '', email: '', phone: '', username: '', password: '' });
+      setManualReferral(false);
+      setCustomReferralCode('');
       setUserId(null);
 
       toast({
@@ -368,6 +426,41 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
                 required
               />
             </div>
+            <div>
+              <Label>Referral Code *</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="auto-ref"
+                    name="ref-type"
+                    checked={!manualReferral}
+                    onChange={() => setManualReferral(false)}
+                  />
+                  <Label htmlFor="auto-ref" className="cursor-pointer">Auto-generate</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="manual-ref"
+                    name="ref-type"
+                    checked={manualReferral}
+                    onChange={() => setManualReferral(true)}
+                  />
+                  <Label htmlFor="manual-ref" className="cursor-pointer">Manual</Label>
+                </div>
+              </div>
+              {manualReferral && (
+                <Input
+                  type="text"
+                  placeholder="Enter custom referral code (min 6 chars)"
+                  value={customReferralCode}
+                  onChange={(e) => setCustomReferralCode(e.target.value)}
+                  className="mt-2"
+                  required
+                />
+              )}
+            </div>
           </div>
           <Button type="submit" className="w-full mt-6" disabled={loading}>
             {loading ? 'Adding...' : (
@@ -399,14 +492,7 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
     username: affiliate.username, 
     password: affiliate.password 
   });
-  const [newReferralCode, setNewReferralCode] = useState(generateReferralCode(affiliate.name, affiliate.uid));
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!affiliate.hasEditedReferral) {
-      setNewReferralCode(generateReferralCode(userDetails.name, affiliate.uid));
-    }
-  }, [userDetails.name, affiliate.hasEditedReferral, affiliate.uid]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -486,8 +572,7 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
         return;
       }
 
-      // Prepare updated data
-      const finalReferralCode = affiliate.hasEditedReferral ? affiliate.referralCode : newReferralCode;
+      // Prepare updated data (referral code not changed here)
       const updatedData = {
         ...affiliate,
         name: userDetails.name,
@@ -495,9 +580,6 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
         phone: userDetails.phone,
         username: userDetails.username,
         password: userDetails.password,
-        referralCode: finalReferralCode,
-        referralLink: `${window.location.origin}/affiliate?ref=${finalReferralCode}`,
-        hasEditedReferral: true,
       };
 
       // Update in Firebase
@@ -529,7 +611,7 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
       <DialogHeader>
         <DialogTitle>Edit Affiliate</DialogTitle>
         <DialogDescription>
-          Update the affiliate details below.
+          Update the affiliate details below. Referral code can be edited separately.
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit}>
@@ -594,31 +676,6 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
               required
             />
           </div>
-          <div>
-            <Label htmlFor="referral">{affiliate.hasEditedReferral ? 'Referral Code' : 'Referral Code *'}</Label>
-            {affiliate.hasEditedReferral ? (
-              <Input
-                id="referral"
-                type="text"
-                value={affiliate.referralCode}
-                disabled
-              />
-            ) : (
-              <Input
-                id="referral"
-                type="text"
-                value={newReferralCode}
-                onChange={(e) => setNewReferralCode(e.target.value)}
-                placeholder="Enter or auto-generate referral code"
-                required
-              />
-            )}
-            {!affiliate.hasEditedReferral && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Edit once: This will be fixed after this update.
-              </p>
-            )}
-          </div>
         </div>
         <DialogFooter className="mt-6">
           <Button type="button" variant="outline" onClick={onClose}>
@@ -633,11 +690,157 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
   );
 };
 
+const EditReferralForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onClose: () => void }> = ({ affiliate, onSuccess, onClose }) => {
+  const { toast } = useToast();
+  const [manualReferral, setManualReferral] = useState(false);
+  const [customReferralCode, setCustomReferralCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState('');
+
+  useEffect(() => {
+    const code = generateReferralCode(affiliate.name, affiliate.uid);
+    setGeneratedCode(code);
+    setCustomReferralCode(code);
+  }, [affiliate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let finalReferralCode: string;
+
+    if (manualReferral) {
+      if (customReferralCode.length < 6) {
+        toast({
+          title: 'Invalid Referral Code',
+          description: 'Referral code must be at least 6 characters.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const codeExists = await checkReferralCodeExists(customReferralCode, affiliate.uid);
+      if (codeExists) {
+        toast({
+          title: 'Referral Code Already Exists',
+          description: 'This referral code is already in use.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      finalReferralCode = customReferralCode;
+    } else {
+      finalReferralCode = generatedCode;
+    }
+
+    setLoading(true);
+
+    try {
+      // Prepare updated data
+      const updatedData = {
+        ...affiliate,
+        referralCode: finalReferralCode,
+        referralLink: `${window.location.origin}/affiliate?ref=${finalReferralCode}`,
+        hasEditedReferral: true,
+      };
+
+      // Update in Firebase
+      const userRef = ref(database, `affiliates/${affiliate.uid}`);
+      await set(userRef, updatedData);
+
+      toast({
+        title: 'Referral Code Updated Successfully! 🎉',
+        description: `Referral code for "${affiliate.name}" has been updated to: ${finalReferralCode}`,
+      });
+
+      console.log('Referral code updated:', updatedData);
+      onSuccess(); // Refetch the list
+      onClose();
+    } catch (error) {
+      console.error('Error updating referral code:', error);
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update referral code. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Edit Referral Code</DialogTitle>
+        <DialogDescription>
+          Update the referral code for this affiliate (one-time edit).
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-3">
+          <div>
+            <Label>Current Referral Code</Label>
+            <Input
+              type="text"
+              value={affiliate.referralCode}
+              disabled
+              className="bg-muted"
+            />
+          </div>
+          <div>
+            <Label>New Referral Code *</Label>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="auto-ref-edit"
+                  name="ref-type-edit"
+                  checked={!manualReferral}
+                  onChange={() => setManualReferral(false)}
+                />
+                <Label htmlFor="auto-ref-edit" className="cursor-pointer">Auto-generate</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="manual-ref-edit"
+                  name="ref-type-edit"
+                  checked={manualReferral}
+                  onChange={() => setManualReferral(true)}
+                />
+                <Label htmlFor="manual-ref-edit" className="cursor-pointer">Manual</Label>
+              </div>
+            </div>
+            <Input
+              type="text"
+              placeholder="Enter custom referral code (min 6 chars)"
+              value={customReferralCode}
+              onChange={(e) => setCustomReferralCode(e.target.value)}
+              className="mt-2"
+              disabled={!manualReferral}
+              required
+            />
+            {!manualReferral && (
+              <p className="text-xs text-muted-foreground mt-1">Auto-generated: {generatedCode}</p>
+            )}
+          </div>
+        </div>
+        <DialogFooter className="mt-6">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Updating...' : 'Update Referral Code'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+};
+
 const AdminAffiliates: React.FC = () => {
   const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingAffiliate, setEditingAffiliate] = useState<Affiliate | null>(null);
+  const [editingReferralAffiliate, setEditingReferralAffiliate] = useState<Affiliate | null>(null);
   const [deletingUid, setDeletingUid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -697,6 +900,16 @@ const AdminAffiliates: React.FC = () => {
               affiliate={editingAffiliate}
               onSuccess={handleEditSuccess}
               onClose={() => setEditingAffiliate(null)}
+            />
+          )}
+        </Dialog>
+
+        <Dialog open={!!editingReferralAffiliate} onOpenChange={() => setEditingReferralAffiliate(null)}>
+          {editingReferralAffiliate && (
+            <EditReferralForm
+              affiliate={editingReferralAffiliate}
+              onSuccess={handleEditSuccess}
+              onClose={() => setEditingReferralAffiliate(null)}
             />
           )}
         </Dialog>
@@ -761,6 +974,12 @@ const AdminAffiliates: React.FC = () => {
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
+                          {!affiliate.hasEditedReferral && (
+                            <Button variant="outline" size="sm" onClick={() => setEditingReferralAffiliate(affiliate)}>
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit Referral
+                            </Button>
+                          )}
                           <Button 
                             variant="destructive" 
                             size="sm" 
