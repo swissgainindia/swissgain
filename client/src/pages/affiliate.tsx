@@ -655,7 +655,7 @@ export default function Affiliate() {
                       value={referralCode}
                       onChange={handleReferralChange}
                       required
-                       disabled
+                       disabled={!!referralCode}
                     />
                     {referrerName && (
                       <p className="text-xs text-green-600 mt-1">Valid! Referred by {referrerName}</p>
