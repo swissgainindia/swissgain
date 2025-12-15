@@ -647,13 +647,15 @@ export default function Affiliate() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="reg-referral">Referral Code (Optional)</Label>
+                    <Label htmlFor="reg-referral">Referral Code (Required)</Label>
                     <Input
                       id="reg-referral"
                       type="text"
                       placeholder="Enter referral code if you have one"
                       value={referralCode}
                       onChange={handleReferralChange}
+                      required
+                       disabled
                     />
                     {referrerName && (
                       <p className="text-xs text-green-600 mt-1">Valid! Referred by {referrerName}</p>
