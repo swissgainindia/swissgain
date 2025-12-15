@@ -40,7 +40,7 @@ export default function NecklaceEcommerceHeader() {
 
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginCreds, setLoginCreds] = useState({ email: '', phone: '' });
+  const [loginCreds, setLoginCreds] = useState({ username: '', password: '' });
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [allProducts, setAllProducts] = useState([]);
@@ -106,24 +106,24 @@ export default function NecklaceEcommerceHeader() {
 
   /* Login function */
   const handleLogin = async () => {
-    if (!loginCreds.email || !loginCreds.phone) {
-      toast({ title: 'Error', description: 'Both email and phone are required.', variant: 'destructive' });
+    if (!loginCreds.username || !loginCreds.password) {
+      toast({ title: 'Error', description: 'Both username and password are required.', variant: 'destructive' });
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(loginCreds.email)) {
-      toast({ title: 'Invalid Email', description: 'Please enter a valid email address.', variant: 'destructive' });
+    if (loginCreds.username.length < 3) {
+      toast({ title: 'Invalid Username', description: 'Username must be at least 3 characters.', variant: 'destructive' });
       return;
     }
-    if (loginCreds.phone.length < 10) {
-      toast({ title: 'Invalid Phone', description: 'Please enter a valid phone number.', variant: 'destructive' });
+
+    if (loginCreds.password.length < 6) {
+      toast({ title: 'Invalid Password', description: 'Password must be at least 6 characters.', variant: 'destructive' });
       return;
     }
 
     setLoginLoading(true);
     try {
-      const user = await findUserByCredentials(loginCreds.email, loginCreds.phone);
+      const user = await findUserByCredentials(loginCreds.username, loginCreds.password);
       if (!user) {
         toast({
           title: 'Account Not Found',
@@ -136,7 +136,7 @@ export default function NecklaceEcommerceHeader() {
 
       login(user);
       setShowLoginModal(false);
-      setLoginCreds({ email: '', phone: '' });
+      setLoginCreds({ username: '', password: '' });
       toast({ title: 'Success!', description: 'Logged in successfully. Redirecting to dashboard...' });
       setTimeout(() => setLocation('/dashboard'), 1500);
 
@@ -328,26 +328,26 @@ export default function NecklaceEcommerceHeader() {
             <div className="space-y-3">
 
               <div>
-                <Label htmlFor="login-email">Email *</Label>
+                <Label htmlFor="login-username">Username *</Label>
                 <Input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={loginCreds.email}
+                  id="login-username"
+                  name="username"
+                  type="text"
+                  placeholder="your username"
+                  value={loginCreds.username}
                   onChange={handleLoginChange}
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="login-phone">Phone *</Label>
+                <Label htmlFor="login-password">Password *</Label>
                 <Input
-                  id="login-phone"
-                  name="phone"
-                  type="tel"
-                  placeholder="9876543210"
-                  value={loginCreds.phone}
+                  id="login-password"
+                  name="password"
+                  type="password"
+                  placeholder="your password"
+                  value={loginCreds.password}
                   onChange={handleLoginChange}
                   required
                 />
@@ -359,7 +359,7 @@ export default function NecklaceEcommerceHeader() {
                 variant="outline"
                 onClick={() => {
                   setShowLoginModal(false);
-                  setLoginCreds({ email: '', phone: '' });
+                  setLoginCreds({ username: '', password: '' });
                 }}
                 disabled={loginLoading}
               >

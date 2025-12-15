@@ -27,11 +27,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth, findUserByCredentials } from './../lib/auth';
-
 // Firebase
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, get, push } from 'firebase/database';
-
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
   authDomain: "swissgain-a2589.firebaseapp.com",
@@ -42,7 +40,6 @@ const firebaseConfig = {
   appId: "1:1062016445247:web:bf559ce1ed7f17e2ca418a",
   measurementId: "G-VTKPWVEY0S"
 };
-
 let app: any, database: any;
 try {
   app = initializeApp(firebaseConfig);
@@ -53,13 +50,11 @@ try {
     database = getDatabase(app);
   }
 }
-
 // Razorpay Configuration
 const RAZORPAY_CONFIG = {
-  key_id: "rzp_live_RjxoVsUGVyJUhQ",
+  key_id: "rzp_live_RjxoVsUGVyJUhQ", 
   key_secret: "shF22XqtflD64nRd2GdzCYoT",
 };
-
 // Load Razorpay script
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -70,27 +65,24 @@ const loadRazorpayScript = () => {
     document.body.appendChild(script);
   });
 };
-
 // Cookie helpers
 const getCookie = (name: string) => {
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? m[2] : null;
 };
-
 export default function Affiliate() {
   const { toast } = useToast();
   const { isLoggedIn, userData, isAffiliate, login, checkAuth } = useAuth();
-  
+ 
   const [userId, setUserId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [userDetails, setUserDetails] = useState({ name: '', email: '', phone: '' });
-  const [loginCreds, setLoginCreds] = useState({ email: '', phone: '' });
+  const [userDetails, setUserDetails] = useState({ name: '', email: '', phone: '', username: '', password: '' });
+  const [loginCreds, setLoginCreds] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [referrerName, setReferrerName] = useState('');
   const [referrerId, setReferrerId] = useState<string | null>(null);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
-
   /* ---------- Initialize User ID ---------- */
   useEffect(() => {
     let uid = getCookie('swissgain_uid');
@@ -99,32 +91,30 @@ export default function Affiliate() {
       document.cookie = `swissgain_uid=${uid};path=/;max-age=31536000`;
     }
     setUserId(uid);
-    
+   
     // Load Razorpay script
     loadRazorpayScript().then((loaded) => {
       setRazorpayLoaded(!!loaded);
     });
   }, []);
-
   /* ---------- Check for referral parameter ---------- */
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
-   
+  
     if (refCode) {
       fetchReferrer(refCode);
     }
   }, []);
-
   /* ---------- Fetch referrer details ---------- */
   const fetchReferrer = async (refCode: string) => {
     try {
       const affiliatesRef = ref(database, 'affiliates');
       const snap = await get(affiliatesRef);
-     
+    
       if (snap.exists()) {
         const affiliates = snap.val();
-       
+      
         // Find affiliate with matching referral code
         for (const [affiliateId, affiliateData] of Object.entries(affiliates)) {
           const data = affiliateData as any;
@@ -139,16 +129,15 @@ export default function Affiliate() {
       console.error('Error fetching referrer:', error);
     }
   };
-
   /* ---------- Check if email exists ---------- */
   const checkEmailExists = async (email: string): Promise<boolean> => {
     try {
       const affiliatesRef = ref(database, 'affiliates');
       const snap = await get(affiliatesRef);
-     
+    
       if (snap.exists()) {
         const affiliates = snap.val();
-       
+      
         // Check if any affiliate has this email
         for (const affiliateData of Object.values(affiliates)) {
           const data = affiliateData as any;
@@ -163,16 +152,38 @@ export default function Affiliate() {
       return false;
     }
   };
-
+  /* ---------- Check if username exists ---------- */
+  const checkUsernameExists = async (username: string): Promise<boolean> => {
+    try {
+      const affiliatesRef = ref(database, 'affiliates');
+      const snap = await get(affiliatesRef);
+    
+      if (snap.exists()) {
+        const affiliates = snap.val();
+      
+        // Check if any affiliate has this username
+        for (const affiliateData of Object.values(affiliates)) {
+          const data = affiliateData as any;
+          if (data.username === username) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return false;
+    }
+  };
   /* ---------- Track referral ---------- */
   const trackReferral = async (referredUserId: string, referrerId: string, userDetails: any) => {
     try {
       console.log('Tracking referral:', { referredUserId, referrerId, userDetails });
-     
+    
       // Add referral to referrer's list
       const referralRef = ref(database, `referrals/${referrerId}/list`);
       const newRef = push(referralRef);
-     
+    
       const referralData = {
         referredUserId: referredUserId,
         referredUserName: userDetails.name,
@@ -183,16 +194,16 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 999  // Changed from 999 to 1
+        purchaseAmount: 0.1 // Changed from 999 to 1
       };
-     
+    
       await set(newRef, referralData);
       console.log('Referral data saved:', referralData);
-      
+     
       // Update referrer stats
       const statsRef = ref(database, `referrals/${referrerId}/stats`);
       const statsSnap = await get(statsRef);
-     
+    
       let currentStats = {
         totalReferrals: 0,
         referralEarnings: 0,
@@ -201,34 +212,32 @@ export default function Affiliate() {
         totalSales: 0,
         conversionRate: 0
       };
-     
+    
       if (statsSnap.exists()) {
         currentStats = statsSnap.val();
       }
-     
+    
       const updatedStats = {
         ...currentStats,
         totalReferrals: currentStats.totalReferrals + 1,
         pendingReferrals: currentStats.pendingReferrals + 1,
         networkSize: currentStats.networkSize + 1
       };
-     
+    
       await set(statsRef, updatedStats);
       console.log('Stats updated:', updatedStats);
       console.log('Referral tracked successfully for referrer:', referrerId);
-     
+    
     } catch (error) {
       console.error('Error tracking referral:', error);
     }
   };
-
   /* ---------- Generate referral code ---------- */
   const generateReferralCode = (name: string, uid: string) => {
     const namePart = name.replace(/\s+/g, '').toLowerCase().substring(0, 6);
     const randomPart = Math.random().toString(36).substring(2, 8);
     return `${namePart}${randomPart}`;
   };
-
   /* ---------- Razorpay Payment Handler ---------- */
   const initiateRazorpayPayment = async () => {
     if (!razorpayLoaded) {
@@ -239,7 +248,6 @@ export default function Affiliate() {
       });
       return false;
     }
-
     if (!window.Razorpay) {
       toast({
         title: 'Payment Error',
@@ -248,10 +256,9 @@ export default function Affiliate() {
       });
       return false;
     }
-
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 99900, // ₹999 in paise (changed from 99900)
+      amount: 10, // ₹999 in paise (changed from 99900)
       currency: 'INR',
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
@@ -282,7 +289,6 @@ export default function Affiliate() {
         }
       }
     };
-
     try {
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.open();
@@ -297,7 +303,6 @@ export default function Affiliate() {
       return false;
     }
   };
-
   /* ---------- Complete registration after successful payment ---------- */
   const completeRegistrationAfterPayment = async (paymentResponse: any) => {
     setLoading(true);
@@ -305,16 +310,18 @@ export default function Affiliate() {
       // Get referral code from URL if exists
       const urlParams = new URLSearchParams(window.location.search);
       const refCode = urlParams.get('ref');
-     
+    
       // Save new affiliate (simplified like the working version)
       const userRef = ref(database, `affiliates/${userId}`);
       const referralCode = generateReferralCode(userDetails.name, userId);
-     
+    
       const userData = {
         uid: userId,
         name: userDetails.name,
         email: userDetails.email,
         phone: userDetails.phone,
+        username: userDetails.username,
+        password: userDetails.password,
         isAffiliate: true,
         joinDate: new Date().toISOString(),
         referralCode: referralCode,
@@ -322,12 +329,12 @@ export default function Affiliate() {
         // Keep it simple like the working version - no payment object
         ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
       };
-      
+     
       await set(userRef, userData);
-      
+     
       // Login the user immediately after registration
       login(userData);
-      
+     
       // Track referral if refCode exists and referrerId is found
       if (refCode && referrerId) {
         await trackReferral(userId, referrerId, userDetails);
@@ -336,15 +343,15 @@ export default function Affiliate() {
           description: `You were referred by ${referrerName}. They will be notified.`,
         });
       }
-      
-      setShowPayment(false);
-      setUserDetails({ name: '', email: '', phone: '' });
      
+      setShowPayment(false);
+      setUserDetails({ name: '', email: '', phone: '', username: '', password: '' });
+    
       toast({
         title: 'Payment Successful! 🎉',
         description: 'Welcome to SwissGain Affiliate Program! Redirecting to dashboard...',
       });
-      
+     
       // Redirect to dashboard after a delay
       setTimeout(() => {
         window.location.href = '/dashboard';
@@ -360,10 +367,9 @@ export default function Affiliate() {
       setLoading(false);
     }
   };
-
   /* ---------- Payment Handler ---------- */
   const handlePayment = async () => {
-    if (!userDetails.name || !userDetails.email || !userDetails.phone) {
+    if (!userDetails.name || !userDetails.email || !userDetails.phone || !userDetails.username || !userDetails.password) {
       toast({
         title: 'Incomplete Details',
         description: 'Please fill all fields.',
@@ -371,7 +377,6 @@ export default function Affiliate() {
       });
       return;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userDetails.email)) {
       toast({
@@ -381,7 +386,7 @@ export default function Affiliate() {
       });
       return;
     }
-   
+  
     if (userDetails.phone.length < 10) {
       toast({
         title: 'Invalid Phone',
@@ -390,7 +395,22 @@ export default function Affiliate() {
       });
       return;
     }
-
+    if (userDetails.username.length < 3) {
+      toast({
+        title: 'Invalid Username',
+        description: 'Username must be at least 3 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (userDetails.password.length < 6) {
+      toast({
+        title: 'Invalid Password',
+        description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!userId) {
       toast({
         title: 'Error',
@@ -399,12 +419,11 @@ export default function Affiliate() {
       });
       return;
     }
-
     setLoading(true);
-
     try {
       const emailExists = await checkEmailExists(userDetails.email);
-     
+      const usernameExists = await checkUsernameExists(userDetails.username);
+    
       if (emailExists) {
         toast({
           title: 'Account Already Exists',
@@ -415,13 +434,21 @@ export default function Affiliate() {
         setLoading(false);
         return;
       }
-
+      if (usernameExists) {
+        toast({
+          title: 'Username Taken',
+          description: 'This username is already taken. Please choose another.',
+          variant: 'destructive',
+        });
+        setShowPayment(false);
+        setLoading(false);
+        return;
+      }
       const paymentInitiated = await initiateRazorpayPayment();
-      
+     
       if (!paymentInitiated) {
         setLoading(false);
       }
-
     } catch (error) {
       console.error('Payment initiation error:', error);
       toast({
@@ -432,58 +459,55 @@ export default function Affiliate() {
       setLoading(false);
     }
   };
-
   /* ---------- Login ---------- */
   const handleLogin = async () => {
-    if (!loginCreds.email || !loginCreds.phone) {
+    if (!loginCreds.username || !loginCreds.password) {
       toast({
         title: 'Error',
-        description: 'Both email and phone are required.',
+        description: 'Both username and password are required.',
         variant: 'destructive',
       });
       return;
     }
-   
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(loginCreds.email)) {
+  
+    if (loginCreds.username.length < 3) {
       toast({
-        title: 'Invalid Email',
-        description: 'Please enter a valid email address.',
+        title: 'Invalid Username',
+        description: 'Username must be at least 3 characters.',
         variant: 'destructive',
       });
       return;
     }
-   
-    if (loginCreds.phone.length < 10) {
+  
+    if (loginCreds.password.length < 6) {
       toast({
-        title: 'Invalid Phone',
-        description: 'Please enter a valid phone number.',
+        title: 'Invalid Password',
+        description: 'Password must be at least 6 characters.',
         variant: 'destructive',
       });
       return;
     }
-
     setLoading(true);
     try {
-      const user = await findUserByCredentials(loginCreds.email, loginCreds.phone);
-     
+      const user = await findUserByCredentials(loginCreds.username, loginCreds.password);
+    
       if (user) {
         login(user);
         setShowLogin(false);
-        setLoginCreds({ email: '', phone: '' });
-       
+        setLoginCreds({ username: '', password: '' });
+      
         toast({
           title: 'Success!',
           description: 'Logged in successfully. Redirecting to dashboard...',
         });
-       
+      
         setTimeout(() => {
           window.location.href = '/dashboard';
         }, 1500);
       } else {
         toast({
           title: 'Invalid Credentials',
-          description: 'No account found with these email and phone combination.',
+          description: 'No account found with these credentials.',
           variant: 'destructive',
         });
       }
@@ -498,18 +522,15 @@ export default function Affiliate() {
       setLoading(false);
     }
   };
-
   /* ---------- Input handlers ---------- */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setUserDetails((prev) => ({ ...prev, [name]: value }));
   };
-
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setLoginCreds((prev) => ({ ...prev, [name]: value }));
   };
-
   /* ---------- Rank data (static) ---------- */
   const rankData = [
     { id: 1, name: "Starter", discount: 100, buyerPays: 2899, selfPV: "Membership Paid", directMembers: 0, teamPV: 0 },
@@ -523,7 +544,6 @@ export default function Affiliate() {
     { id: 9, name: "Crown", discount: 900, buyerPays: 2099, selfPV: 64000, directMembers: 75, teamPV: 170000 },
     { id: 10, name: "Legend", discount: 1000, buyerPays: 1999, selfPV: 128000, directMembers: 100, teamPV: 300000 }
   ];
-
   return (
     <div className="py-12 bg-gradient-to-b from-muted/20 to-muted/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -538,7 +558,7 @@ export default function Affiliate() {
             </div>
           </div>
         )}
-        
+       
         {/* Hero */}
         <div className="text-center mb-12">
           <Badge variant="outline" className="mb-4 py-1 px-3 text-primary font-semibold">
@@ -550,7 +570,6 @@ export default function Affiliate() {
             Grow your team and increase your earnings through our 10-rank advancement system.
           </p>
         </div>
-
         {/* ---------- Payment Modal ---------- */}
         {showPayment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -600,8 +619,31 @@ export default function Affiliate() {
                       required
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="reg-username">Username *</Label>
+                    <Input
+                      id="reg-username"
+                      name="username"
+                      type="text"
+                      placeholder="Choose a unique username"
+                      value={userDetails.username}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="reg-password">Password *</Label>
+                    <Input
+                      id="reg-password"
+                      name="password"
+                      type="password"
+                      placeholder="Create a password"
+                      value={userDetails.password}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
                 </div>
-
                 <div className="bg-muted p-4 rounded-lg">
                   <h4 className="font-semibold mb-2">Payment Summary</h4>
                   <div className="space-y-2 text-sm">
@@ -618,13 +660,11 @@ export default function Affiliate() {
                     </div>
                   </div>
                 </div>
-
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                   <p className="text-xs text-green-700">
                     <strong>Secure Payment:</strong> Powered by Razorpay. Your payment details are safe and encrypted.
                   </p>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <Button variant="outline" onClick={() => setShowPayment(false)} disabled={loading}>
                     Cancel
@@ -637,7 +677,6 @@ export default function Affiliate() {
             </Card>
           </div>
         )}
-
         {/* ---------- Login Modal ---------- */}
         {showLogin && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -647,30 +686,30 @@ export default function Affiliate() {
                   <LogIn className="h-5 w-5" />
                   Login to Your Account
                 </CardTitle>
-                <CardDescription>Enter your registered email and phone</CardDescription>
+                <CardDescription>Enter your username and password</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="login-email">Email *</Label>
+                    <Label htmlFor="login-username">Username *</Label>
                     <Input
-                      id="login-email"
-                      name="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={loginCreds.email}
+                      id="login-username"
+                      name="username"
+                      type="text"
+                      placeholder="your username"
+                      value={loginCreds.username}
                       onChange={handleLoginChange}
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="login-phone">Phone *</Label>
+                    <Label htmlFor="login-password">Password *</Label>
                     <Input
-                      id="login-phone"
-                      name="phone"
-                      type="tel"
-                      placeholder="9876543210"
-                      value={loginCreds.phone}
+                      id="login-password"
+                      name="password"
+                      type="password"
+                      placeholder="your password"
+                      value={loginCreds.password}
                       onChange={handleLoginChange}
                       required
                     />
@@ -700,7 +739,6 @@ export default function Affiliate() {
             </Card>
           </div>
         )}
-
         {/* ---------- Main Content ---------- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
           {/* How it works */}
@@ -777,7 +815,6 @@ export default function Affiliate() {
               </CardContent>
             </Card>
           </div>
-
           {/* Membership Card */}
           <Card className="bg-white shadow-xl border-0 overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent"></div>
@@ -851,7 +888,6 @@ export default function Affiliate() {
     </div>
   );
 }
-
 // Add Razorpay type declaration
 declare global {
   interface Window {
