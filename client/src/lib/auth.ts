@@ -129,12 +129,16 @@ export const useAuth = () => {
   }, [affiliateData, isLoggedIn, isLoggedOut]);
 
   const login = (data: any) => {
-    const realUid = data.userId || data.id || uid;
+    const realUid = data.userId || data.id || data.uid || uid;
     if (realUid !== uid) setCookie('swissgain_uid', realUid, 365);
+    
+    // Strip sensitive fields like password before storing
+    const { password, ...safeData } = data;
+    
     setIsLoggedIn(true);
     setIsLoggedOut(false); // clear logout flag
-    setUserData(data);
-    setCookie('swissgain_user', JSON.stringify(data), 365);
+    setUserData(safeData);
+    setCookie('swissgain_user', JSON.stringify(safeData), 365);
   };
 
   const logout = () => {
@@ -159,31 +163,42 @@ export const useAuth = () => {
   };
 };
 
-/* ---------- Find user by email + phone ---------- */
-export const findUserByCredentials = async (email: string, phone: string) => {
+/* ---------- Find user by username + password (case-insensitive username) ---------- */
+export const findUserByCredentials = async (username: string, password: string) => {
   try {
+    console.log('Searching for user:', { username, password: '***' }); // Sanitized log for debugging
+    
+    // First, check affiliatesList if it has username/password (fallback)
     const listSnap = await get(ref(db, 'affiliatesList'));
     if (listSnap.exists()) {
       const list = listSnap.val();
       for (const key in list) {
         const u = list[key];
-        if (u.email === email.toLowerCase().trim() && u.phone === phone.trim())
-          return { ...u, userId: u.userId };
+        if (u.username?.toLowerCase().trim() === username.toLowerCase().trim() && u.password === password) {
+          console.log('User found in affiliatesList:', key);
+          return { ...u, userId: u.userId || key };
+        }
       }
     }
 
+    // Primary: Search full affiliates object
     const allSnap = await get(ref(db, 'affiliates'));
     if (allSnap.exists()) {
       const all = allSnap.val();
       for (const uid in all) {
         const u = all[uid];
-        if (u.email === email.toLowerCase().trim() && u.phone === phone.trim())
-          return { ...u, userId: uid };
+        if (u.username?.toLowerCase().trim() === username.toLowerCase().trim() && u.password === password) {
+          const user = { ...u, userId: uid };
+          console.log('User found in affiliates:', uid);
+          return user;
+        }
       }
     }
+    
+    console.log('No matching user found');
     return null;
   } catch (e) {
-    console.error(e);
+    console.error('Error in findUserByCredentials:', e);
     return null;
   }
 };
@@ -193,6 +208,7 @@ export const saveNewAffiliate = async (uid: string, payload: any) => {
   const affRef = ref(db, `affiliates/${uid}`);
   const affiliateData = {
     ...payload,
+    uid, // Ensure uid is set
     id: uid,
     joinedAt: new Date().toISOString(),
     isAffiliate: true,
@@ -208,6 +224,8 @@ export const saveNewAffiliate = async (uid: string, payload: any) => {
     name: payload.name,
     email: payload.email.toLowerCase().trim(),
     phone: payload.phone.trim(),
+    username: payload.username?.toLowerCase().trim(), // Add username to list for fallback
+    // Note: Do NOT store password in affiliatesList for security
     joinedAt: affiliateData.joinedAt,
     rank: 1,
     status: 'active',
