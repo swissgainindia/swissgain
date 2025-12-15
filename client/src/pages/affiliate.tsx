@@ -52,7 +52,7 @@ try {
 }
 // Razorpay Configuration
 const RAZORPAY_CONFIG = {
-  key_id: "rzp_live_RjxoVsUGVyJUhQ", 
+  key_id: "rzp_live_RjxoVsUGVyJUhQ",
   key_secret: "shF22XqtflD64nRd2GdzCYoT",
 };
 // Load Razorpay script
@@ -194,7 +194,7 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 0.1 // Changed from 999 to 1
+        purchaseAmount: 999 // Changed from 999 to 1
       };
     
       await set(newRef, referralData);
@@ -258,7 +258,7 @@ export default function Affiliate() {
     }
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 10, // ₹999 in paise (changed from 99900)
+      amount: 99900, // ₹999 in paise (changed from 99900)
       currency: 'INR',
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
