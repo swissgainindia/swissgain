@@ -480,7 +480,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Initiate Razorpay Payment
-  const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) => {
+  const initiateRazorpayPayment = async (orderData: OrderData) => {
     if (!razorpayLoaded) {
       toast({
         title: 'Payment Error',
@@ -507,9 +507,44 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       description: `Purchase: ${product.name}`,
       image: '/logo.png',
       handler: async function (response: any) {
-        console.log('Payment successful:', response);
-        await handleSuccessfulPayment(response, orderData, orderId);
-      },
+  try {
+    // ✅ 1. Save order ONLY after payment success
+    const paidOrderData: OrderData = {
+      ...orderData,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      paymentId: response.razorpay_payment_id,
+      razorpayOrderId: response.razorpay_order_id || '',
+      razorpaySignature: response.razorpay_signature || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    const orderId = await saveOrderToFirebase(paidOrderData);
+
+    toast({
+      title: "Payment Successful 🎉",
+      description: `Order ID: ${orderId}`,
+    });
+
+    // ✅ 2. Process commissions AFTER order is saved
+    await processCommissionsAfterPayment(orderId, paidOrderData);
+
+    // ✅ 3. Redirect
+    onClose();
+    setTimeout(() => {
+      window.location.href = `/thank-you?order=${orderId}`;
+    }, 1200);
+
+  } catch (err) {
+    console.error('Order save failed after payment:', err);
+    toast({
+      title: "Payment done but order failed",
+      description: "Please contact support with payment ID",
+      variant: "destructive",
+    });
+  }
+}
+,
       prefill: {
         name: formData.name,
         email: formData.email,
@@ -653,67 +688,50 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
-      toast({ title: "Incomplete Form", description: "Please fill all fields.", variant: "destructive" });
-      return;
-    }
+  e.preventDefault();
 
-    setLoading(true);
-    try {
-      const purchaseCustomerId = generatePurchaseCustomerId();
-      const orderData: OrderData = {
-        productId: product._id,
-        ...(affiliateId && { affiliateId }),
-        customerId: purchaseCustomerId,
-        originalCustomerId: customerId,
-        productName: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice,
-        quantity,
-        totalAmount,
-        customerInfo: formData,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        images: product.images,
-        category: product.category,
-        discount: product.discount,
-        productDescription: product.description,
-        productFeatures: product.features,
-        productBrand: product.brand || 'SwissGain',
-        productRating: product.rating,
-        productReviews: product.reviews,
-        paymentMethod: 'razorpay',
-        paymentStatus: 'pending'
-      };
+  if (!formData.name || !formData.email || !formData.phone || !formData.address) {
+    toast({ title: "Incomplete Form", variant: "destructive" });
+    return;
+  }
 
-      const orderId = await saveOrderToFirebase(orderData);
-      console.log(`✅ Order saved: ${orderId}`);
+  setLoading(true);
 
-      // Update order with pending payment status
-      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-      await update(orderRef, {
-        uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString()
-      });
+  try {
+    const purchaseCustomerId = generatePurchaseCustomerId();
 
-      // Initiate Razorpay payment
-      const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
-      
-      if (!paymentInitiated) {
-        setLoading(false);
-      }
+    const orderData: OrderData = {
+      productId: product._id,
+      ...(affiliateId && { affiliateId }),
+      customerId: purchaseCustomerId,
+      originalCustomerId: customerId,
+      productName: product.name,
+      price: product.price,
+      quantity,
+      totalAmount,
+      customerInfo: formData,
+      images: product.images,
+      category: product.category,
+      paymentMethod: 'razorpay',
+      paymentStatus: 'pending', // will change after payment
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
 
-    } catch (error: any) {
-      console.error('❌ Order placement error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to place order.",
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
+    // 🔥 Directly open Razorpay
+    await initiateRazorpayPayment(orderData);
+
+  } catch (err: any) {
+    toast({
+      title: "Checkout Failed",
+      description: err.message,
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
