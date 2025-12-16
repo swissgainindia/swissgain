@@ -506,9 +506,8 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       name: 'SwissGain',
       description: `Purchase: ${product.name}`,
       image: '/logo.png',
-      handler: async function (response: any) {
+handler: async function (response: any) {
   try {
-    // ✅ 1. Save order ONLY after payment success
     const paidOrderData: OrderData = {
       ...orderData,
       status: 'confirmed',
@@ -521,42 +520,37 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 
     const orderId = await saveOrderToFirebase(paidOrderData);
 
+    await processCommissionsAfterPayment(orderId, paidOrderData);
+
     toast({
       title: "Payment Successful 🎉",
       description: `Order ID: ${orderId}`,
     });
 
-    // ✅ 2. Process commissions AFTER order is saved
-    await processCommissionsAfterPayment(orderId, paidOrderData);
-
-    // ✅ 3. Redirect
     onClose();
-    setTimeout(() => {
-      window.location.href = `/thank-you?order=${orderId}`;
-    }, 1200);
-
+    window.location.href = `/thank-you?order=${orderId}`;
   } catch (err) {
-    console.error('Order save failed after payment:', err);
     toast({
       title: "Payment done but order failed",
-      description: "Please contact support with payment ID",
+      description: "Contact support with payment ID",
       variant: "destructive",
     });
   }
 }
+
 ,
       prefill: {
         name: formData.name,
         email: formData.email,
         contact: formData.phone,
       },
-      notes: {
-        address: formData.address,
-        order_id: orderId,
-        product_id: product._id,
-        customer_id: customerId,
-        affiliate_id: affiliateId || 'none'
-      },
+    notes: {
+  address: formData.address,
+  product_id: product._id,
+  customer_id: customerId,
+  affiliate_id: affiliateId || 'none'
+},
+
       theme: {
         color: '#b45309',
       },
@@ -583,54 +577,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         variant: 'destructive',
       });
       return false;
-    }
-  };
-
-  // Handle successful payment
-  const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
-    setPaymentLoading(true);
-    console.log('Payment response received:', paymentResponse);
-    
-    try {
-      // Basic order update
-      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-      await update(orderRef, {
-        status: 'confirmed',
-        paymentStatus: 'paid',
-        paymentId: paymentResponse.razorpay_payment_id,
-        paymentUpdatedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      
-      toast({
-        title: "Payment Successful! 🎉",
-        description: `Order ID: ${orderId}`,
-      });
-      
-      // Process commissions silently
-      try {
-        await processCommissionsAfterPayment(orderId, orderData);
-      } catch (e) {
-        console.log('Commissions will be processed later');
-      }
-      
-      onClose();
-      setTimeout(() => {
-        window.location.href = `/thank-you?order=${orderId}`;
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Error:', error);
-      toast({
-        title: "Order Received",
-        description: "Payment successful! Your order is being processed.",
-      });
-      onClose();
-      setTimeout(() => {
-        window.location.href = `/thank-you?order=${orderId}`;
-      }, 1000);
-    } finally {
-      setPaymentLoading(false);
     }
   };
 
