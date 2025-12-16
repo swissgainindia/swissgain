@@ -528,7 +528,7 @@ handler: async function (response: any) {
     });
 
     onClose();
-    window.location.href = `/thank-you?order=${orderId}`;
+    window.location.href = `/thank-you`;
   } catch (err) {
     toast({
       title: "Payment done but order failed",

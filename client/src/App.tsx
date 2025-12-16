@@ -22,6 +22,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RefundAndCancellation from "./pages/RefundAndCancellation";
 import AffiliateSales from "./pages/AffilliateSales";
 import TestReferralEarnings from "./pages/admin/TestReferralEarnings";
+import ThankYouPage from "./pages/thankyou";
 
 function Router() {
   return (
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/product/:id" component={ProductDetail} />
       
       <Route path="/affiliate" component={Affiliate} />
+       <Route path="/thank-you" component={ThankYouPage} />
       <Route path="/refer-earn" component={ReferEarn} />
       <Route path="/cart" component={Cart} />
       <Route path="/dashboard" component={Dashboard} />
