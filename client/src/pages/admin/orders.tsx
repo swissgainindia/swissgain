@@ -100,29 +100,35 @@ export default function AdminOrders() {
           const ordersData = snapshot.val();
           const ordersArray: Order[] = [];
           
+          // Default customer info
+          const defaultCustomerInfo = {
+            name: "N/A",
+            email: "N/A",
+            phone: "N/A",
+            address: "N/A",
+            city: "N/A",
+            state: "N/A",
+            pincode: "N/A"
+          };
+          
           // Convert Firebase object to array
           Object.entries(ordersData).forEach(([key, value]: [string, any]) => {
             ordersArray.push({
               id: value.id || key,
-              productId: value.productId,
+              productId: value.productId || '',
               affiliateId: value.affiliateId,
               customerId: value.customerId,
-              productName: value.productName,
+              productName: value.productName || 'Unknown',
               price: value.price || 0,
               originalPrice: value.originalPrice,
               quantity: value.quantity || 1,
               totalAmount: value.totalAmount || 0,
-              customerInfo: value.customerInfo || {
-                name: "N/A",
-                email: "N/A",
-                phone: "N/A",
-                address: "N/A",
-                city: "N/A",
-                state: "N/A",
-                pincode: "N/A"
+              customerInfo: {
+                ...defaultCustomerInfo,
+                ... (value.customerInfo || {})
               },
               status: value.status || 'pending',
-              createdAt: value.createdAt,
+              createdAt: value.createdAt || new Date().toISOString(),
               images: value.images || [],
               category: value.category || "Unknown",
               discount: value.discount,
@@ -226,10 +232,10 @@ export default function AdminOrders() {
   // Filter orders based on search and status
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
-      order.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerInfo.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.id.toLowerCase().includes(searchTerm.toLowerCase());
+      (order.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.customerInfo.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.customerInfo.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.id || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     
