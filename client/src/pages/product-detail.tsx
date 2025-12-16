@@ -931,6 +931,8 @@ export default function ProductDetail() {
     </div>
   );
 
+  const isInStock = product.stock > 0;
+
   return (
     <div className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1002,48 +1004,58 @@ export default function ProductDetail() {
             </div>
 
             <div className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium">Quantity:</label>
-                <div className="flex items-center border rounded-lg">
+              {isInStock && (
+                <div className="flex items-center space-x-4">
+                  <label className="text-sm font-medium">Quantity:</label>
+                  <div className="flex items-center border rounded-lg">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input 
+                      type="number" 
+                      value={quantity} 
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} 
+                      className="w-16 text-center border-0" 
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setQuantity(q => q + 1)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {isInStock ? (
+                <div className="flex flex-col sm:flex-row gap-4">
                   <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)}
+                    onClick={handleAddToCart} 
+                    className="flex-1 gradient-primary text-primary-foreground py-3" 
+                    size="lg"
                   >
-                    <Minus className="h-4 w-4" />
+                    <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
                   </Button>
-                  <Input 
-                    type="number" 
-                    value={quantity} 
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} 
-                    className="w-16 text-center border-0" 
-                  />
                   <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setQuantity(q => q + 1)}
+                    onClick={handleBuyNow} 
+                    className="flex-1 gradient-gold text-accent-foreground py-3" 
+                    size="lg"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Zap className="mr-2 h-5 w-5" /> Buy Now
                   </Button>
                 </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  onClick={handleAddToCart} 
-                  className="flex-1 gradient-primary text-primary-foreground py-3" 
-                  size="lg"
-                >
-                  <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-                </Button>
-                <Button 
-                  onClick={handleBuyNow} 
-                  className="flex-1 gradient-gold text-accent-foreground py-3" 
-                  size="lg"
-                >
-                  <Zap className="mr-2 h-5 w-5" /> Buy Now
-                </Button>
-              </div>
+              ) : (
+                <div className="flex justify-center py-4">
+                  <Badge variant="destructive" className="text-lg px-4 py-2">
+                    Out of Stock
+                  </Badge>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4 pt-6 border-t">

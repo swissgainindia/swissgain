@@ -90,7 +90,7 @@ export default function AdminProducts() {
               <TableHead>Category</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Stock</TableHead>
-              <TableHead>Sales</TableHead>
+              {/* <TableHead>Sales</TableHead> */}
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -108,7 +108,7 @@ export default function AdminProducts() {
                 <TableCell>{product.category}</TableCell>
                 <TableCell>₹{product.price}</TableCell>
                 <TableCell>{product.inStock ? "In Stock" : "Out of Stock"}</TableCell>
-                <TableCell>{product.sales || 0}</TableCell>
+                {/* <TableCell>{product.sales || 0}</TableCell> */}
                 <TableCell>
                   <div className="flex gap-2">
                     <Button
