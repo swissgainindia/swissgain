@@ -11,7 +11,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '@/components/product-card';
-import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard } from 'lucide-react';
+import { Star, Check, ShoppingCart, Zap, Truck, RotateCw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard } from 'lucide-react';
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
@@ -80,6 +80,7 @@ const loadRazorpayScript = () => {
 const commissionRates = [0.10, 0.05, 0.025, 0.02, 0.015, 0.01, 0.008, 0.006, 0.005, 0.005];
 
 interface OrderData {
+  id?: string;
   productId: string;
   affiliateId?: string;
   customerId?: string;
@@ -158,23 +159,23 @@ const getUplineChain = async (affiliateId: string, maxLevels = 10): Promise<any[
 };
 
 // Save Order
-const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
+const saveOrderToFirebase = async (orderData: OrderData, orderId?: string): Promise<string> => {
   try {
     const ordersRef = ref(firebaseDatabase, 'orders');
-    const newOrderRef = push(ordersRef);
-    const orderId = newOrderRef.key!;
+    const finalOrderId = orderId || push(ordersRef).key!;
+    const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const orderWithId = {
       ...orderData,
-      id: orderId,
-      uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
+      id: finalOrderId,
+      uniqueOrderId,
+      timestamp: orderData.createdAt,
       commissionProcessed: false,
       creditedUplines: {}
     };
     
-    await set(newOrderRef, orderWithId);
-    return orderId;
+    await set(ref(ordersRef, finalOrderId), orderWithId);
+    return finalOrderId;
   } catch (error) {
     console.error('Error saving order:', error);
     throw error;
@@ -529,7 +530,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         ondismiss: function() {
           toast({
             title: 'Payment Cancelled',
-            description: 'You cancelled the payment process.',
+            description: 'Payment cancelled. No order has been created.',
             variant: 'default',
           });
         }
@@ -557,43 +558,37 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     console.log('Payment response received:', paymentResponse);
     
     try {
-      // Basic order update
-      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-      await update(orderRef, {
-        status: 'confirmed',
-        paymentStatus: 'paid',
-        paymentId: paymentResponse.razorpay_payment_id,
-        paymentUpdatedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
+      // Save order only after successful payment
+      const savedOrderId = await saveOrderToFirebase(orderData, orderId);
+      
+      // Update payment status
+      await updateOrderPaymentStatus(savedOrderId, paymentResponse.razorpay_payment_id, 'paid');
       
       toast({
         title: "Payment Successful! 🎉",
-        description: `Order ID: ${orderId}`,
+        description: `Order ID: ${savedOrderId}`,
       });
       
       // Process commissions silently
       try {
-        await processCommissionsAfterPayment(orderId, orderData);
+        await processCommissionsAfterPayment(savedOrderId, orderData);
       } catch (e) {
         console.log('Commissions will be processed later');
       }
       
       onClose();
       setTimeout(() => {
-        window.location.href = `/thank-you?order=${orderId}`;
+        window.location.href = `/thank-you?order=${savedOrderId}`;
       }, 1500);
       
     } catch (error) {
       console.error('Error:', error);
       toast({
-        title: "Order Received",
-        description: "Payment successful! Your order is being processed.",
+        title: "Payment Successful, but Order Processing Failed",
+        description: "Your payment went through, but there was an issue saving the order. Please contact support.",
+        variant: "destructive",
       });
       onClose();
-      setTimeout(() => {
-        window.location.href = `/thank-you?order=${orderId}`;
-      }, 1000);
     } finally {
       setPaymentLoading(false);
     }
@@ -662,6 +657,8 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     setLoading(true);
     try {
       const purchaseCustomerId = generatePurchaseCustomerId();
+      const now = new Date().toISOString();
+      const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const orderData: OrderData = {
         productId: product._id,
         ...(affiliateId && { affiliateId }),
@@ -674,7 +671,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         totalAmount,
         customerInfo: formData,
         status: 'pending',
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         images: product.images,
         category: product.category,
         discount: product.discount,
@@ -687,17 +684,9 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         paymentStatus: 'pending'
       };
 
-      const orderId = await saveOrderToFirebase(orderData);
-      console.log(`✅ Order saved: ${orderId}`);
+      console.log(`🆕 Generated order ID: ${orderId}`);
 
-      // Update order with pending payment status
-      const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
-      await update(orderRef, {
-        uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString()
-      });
-
-      // Initiate Razorpay payment
+      // Initiate Razorpay payment (order will be saved only on success)
       const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
       
       if (!paymentInitiated) {
@@ -708,7 +697,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       console.error('❌ Order placement error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to place order.",
+        description: error.message || "Failed to initiate payment.",
         variant: "destructive",
       });
       setLoading(false);
