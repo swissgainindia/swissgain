@@ -11,7 +11,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '@/components/product-card';
-import { Star, Check, ShoppingCart, Zap, Truck, RotateCw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard } from 'lucide-react';
+import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard } from 'lucide-react';
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
@@ -80,7 +80,6 @@ const loadRazorpayScript = () => {
 const commissionRates = [0.10, 0.05, 0.025, 0.02, 0.015, 0.01, 0.008, 0.006, 0.005, 0.005];
 
 interface OrderData {
-  id?: string;
   productId: string;
   affiliateId?: string;
   customerId?: string;
@@ -159,23 +158,23 @@ const getUplineChain = async (affiliateId: string, maxLevels = 10): Promise<any[
 };
 
 // Save Order
-const saveOrderToFirebase = async (orderData: OrderData, orderId?: string): Promise<string> => {
+const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
   try {
     const ordersRef = ref(firebaseDatabase, 'orders');
-    const finalOrderId = orderId || push(ordersRef).key!;
-    const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newOrderRef = push(ordersRef);
+    const orderId = newOrderRef.key!;
     
     const orderWithId = {
       ...orderData,
-      id: finalOrderId,
-      uniqueOrderId,
-      timestamp: orderData.createdAt,
+      id: orderId,
+      uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString(),
       commissionProcessed: false,
       creditedUplines: {}
     };
     
-    await set(ref(ordersRef, finalOrderId), orderWithId);
-    return finalOrderId;
+    await set(newOrderRef, orderWithId);
+    return orderId;
   } catch (error) {
     console.error('Error saving order:', error);
     throw error;
@@ -183,7 +182,7 @@ const saveOrderToFirebase = async (orderData: OrderData, orderId?: string): Prom
 };
 
 // Update Order Payment Status
-const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
+const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed' | 'cancelled'): Promise<void> => {
   try {
     console.log(`Updating order ${orderId} with payment ${paymentId}, status: ${status}`);
     const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
@@ -191,8 +190,8 @@ const updateOrderPaymentStatus = async (orderId: string, paymentId: string, stat
       paymentId,
       paymentStatus: status,
       status: status === 'paid' ? 'confirmed' : 'cancelled',
-      paymentUpdatedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      ...(status !== 'paid' && { updatedAt: new Date().toISOString() }),
+      ...(status === 'paid' && { paymentUpdatedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
     };
     
     console.log('Firebase update data:', updates);
@@ -439,6 +438,8 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   const [loading, setLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
@@ -450,14 +451,18 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       loading,
       paymentLoading,
       razorpayLoaded,
+      orderId,
+      paymentSuccess,
       formData,
       totalAmount
     });
-  }, [isOpen, loading, paymentLoading, razorpayLoaded, formData, totalAmount]);
+  }, [isOpen, loading, paymentLoading, razorpayLoaded, orderId, paymentSuccess, formData, totalAmount]);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+      setOrderId(null);
+      setPaymentSuccess(false);
       
       // Load Razorpay script when modal opens
       loadRazorpayScript().then((loaded) => {
@@ -473,6 +478,18 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     }
   }, [isOpen]);
 
+  // Cancel order if modal closes without successful payment
+  useEffect(() => {
+    if (!isOpen && orderId && !paymentSuccess) {
+      if (orderId) {
+        updateOrderPaymentStatus(orderId, '', 'failed').catch((error) => {
+          console.error('Failed to cancel order on modal close:', error);
+        });
+      }
+      setOrderId(null);
+    }
+  }, [isOpen, orderId, paymentSuccess]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -481,7 +498,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Initiate Razorpay Payment
-  const initiateRazorpayPayment = async (orderData: OrderData, orderId: string) => {
+  const initiateRazorpayPayment = async (orderData: OrderData, savedOrderId: string) => {
     if (!razorpayLoaded) {
       toast({
         title: 'Payment Error',
@@ -509,7 +526,8 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       image: '/logo.png',
       handler: async function (response: any) {
         console.log('Payment successful:', response);
-        await handleSuccessfulPayment(response, orderData, orderId);
+        setPaymentSuccess(true);
+        await handleSuccessfulPayment(response, orderData, savedOrderId);
       },
       prefill: {
         name: formData.name,
@@ -518,7 +536,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       },
       notes: {
         address: formData.address,
-        order_id: orderId,
+        order_id: savedOrderId,
         product_id: product._id,
         customer_id: customerId,
         affiliate_id: affiliateId || 'none'
@@ -528,9 +546,15 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       },
       modal: {
         ondismiss: function() {
+          setPaymentLoading(false);
+          if (orderId && !paymentSuccess) {
+            updateOrderPaymentStatus(orderId, '', 'failed').catch((error) => {
+              console.error('Failed to cancel order on payment dismiss:', error);
+            });
+          }
           toast({
             title: 'Payment Cancelled',
-            description: 'Payment cancelled. No order has been created.',
+            description: 'You cancelled the payment process.',
             variant: 'default',
           });
         }
@@ -548,20 +572,21 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         description: 'Failed to initialize payment. Please try again.',
         variant: 'destructive',
       });
+      // Cancel order if initiation fails
+      if (orderId) {
+        updateOrderPaymentStatus(orderId, '', 'failed').catch(console.error);
+      }
       return false;
     }
   };
 
   // Handle successful payment
-  const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, orderId: string) => {
+  const handleSuccessfulPayment = async (paymentResponse: any, orderData: OrderData, savedOrderId: string) => {
     setPaymentLoading(true);
     console.log('Payment response received:', paymentResponse);
     
     try {
-      // Save order only after successful payment
-      const savedOrderId = await saveOrderToFirebase(orderData, orderId);
-      
-      // Update payment status
+      // Basic order update
       await updateOrderPaymentStatus(savedOrderId, paymentResponse.razorpay_payment_id, 'paid');
       
       toast({
@@ -570,11 +595,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
       
       // Process commissions silently
-      try {
-        await processCommissionsAfterPayment(savedOrderId, orderData);
-      } catch (e) {
-        console.log('Commissions will be processed later');
-      }
+      await processCommissionsAfterPayment(savedOrderId, orderData);
       
       onClose();
       setTimeout(() => {
@@ -582,15 +603,15 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       }, 1500);
       
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error in handleSuccessfulPayment:', error);
       toast({
-        title: "Payment Successful, but Order Processing Failed",
-        description: "Your payment went through, but there was an issue saving the order. Please contact support.",
+        title: "Payment Confirmed, But Order Update Failed",
+        description: "Your payment was successful, but there was an issue updating the order. Please contact support with Payment ID: " + paymentResponse.razorpay_payment_id,
         variant: "destructive",
       });
-      onClose();
-    } finally {
+      // Do not redirect or close modal on error - allow retry or manual intervention
       setPaymentLoading(false);
+      setPaymentSuccess(false); // Reset to allow potential retry
     }
   };
 
@@ -657,8 +678,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     setLoading(true);
     try {
       const purchaseCustomerId = generatePurchaseCustomerId();
-      const now = new Date().toISOString();
-      const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const orderData: OrderData = {
         productId: product._id,
         ...(affiliateId && { affiliateId }),
@@ -671,7 +690,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         totalAmount,
         customerInfo: formData,
         status: 'pending',
-        createdAt: now,
+        createdAt: new Date().toISOString(),
         images: product.images,
         category: product.category,
         discount: product.discount,
@@ -684,20 +703,31 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         paymentStatus: 'pending'
       };
 
-      console.log(`🆕 Generated order ID: ${orderId}`);
+      const savedOrderId = await saveOrderToFirebase(orderData);
+      setOrderId(savedOrderId);
+      console.log(`✅ Order saved: ${savedOrderId}`);
 
-      // Initiate Razorpay payment (order will be saved only on success)
-      const paymentInitiated = await initiateRazorpayPayment(orderData, orderId);
+      // Update order with pending payment status
+      const orderRef = ref(firebaseDatabase, `orders/${savedOrderId}`);
+      await update(orderRef, {
+        uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString()
+      });
+
+      // Initiate Razorpay payment
+      const paymentInitiated = await initiateRazorpayPayment(orderData, savedOrderId);
       
       if (!paymentInitiated) {
         setLoading(false);
+        // Reset on failure
+        setOrderId(null);
       }
 
     } catch (error: any) {
       console.error('❌ Order placement error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to initiate payment.",
+        description: error.message || "Failed to place order.",
         variant: "destructive",
       });
       setLoading(false);
@@ -705,7 +735,11 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        onClose();
+      }
+    }}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
