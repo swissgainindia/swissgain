@@ -434,7 +434,6 @@ interface CheckoutModalProps {
   uid?: string;
 }
 
-// Checkout Modal with Razorpay Integration - Updated with proper order saving
 function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -444,6 +443,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
   const totalAmount = product.price * quantity;
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('CheckoutModal state:', {
@@ -459,6 +459,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
+      setOrderId(null);
       
       // Load Razorpay script when modal opens
       loadRazorpayScript().then((loaded) => {
@@ -481,12 +482,65 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Save Order AFTER payment success
-  const saveOrderAfterPayment = async (paymentResponse: any): Promise<string> => {
+  // Process commissions after payment
+  const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
+    console.log('Starting commission processing for order:', orderId);
+    console.log('Order data:', orderData);
+    console.log('Form data:', formData);
+    
     try {
-      console.log('Starting order saving process...');
-      console.log('Payment response:', paymentResponse);
-      
+      // Combined 10% + ₹100 Bonus for Direct Referral Link
+      if (affiliateId && uid !== affiliateId) {
+        console.log('Checking affiliate:', affiliateId);
+        const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
+        console.log('Affiliate exists:', referrerSnap.exists());
+        
+        if (referrerSnap.exists()) {
+          console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
+          await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
+        } else {
+          console.log(`❌ Affiliate ${affiliateId} not found in database`);
+        }
+      } else {
+        console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
+      }
+
+      // Multi-level commissions (only if buyer is affiliate)
+      if (uid) {
+        console.log('Checking if buyer is affiliate:', uid);
+        const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
+        console.log('Buyer affiliate check:', {
+          exists: affSnap.exists(),
+          isAffiliate: affSnap.exists() ? affSnap.val().isAffiliate : false
+        });
+        
+        if (affSnap.exists() && affSnap.val().isAffiliate) {
+          console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
+          await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
+        } else {
+          console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
+        }
+      }
+
+      console.log(`✅ All commissions processed for order: ${orderId}`);
+    } catch (error) {
+      console.error('Commission processing error details:', {
+        error: error.message,
+        stack: error.stack,
+        orderId,
+        affiliateId,
+        uid
+      });
+      throw error;
+    }
+  };
+
+  // Handle successful payment - Save order and process commissions
+  const handleSuccessfulPayment = async (paymentResponse: any) => {
+    setPaymentLoading(true);
+    console.log('Payment response received:', paymentResponse);
+    
+    try {
       const purchaseCustomerId = generatePurchaseCustomerId();
       
       // Create order data
@@ -518,249 +572,39 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         razorpaySignature: paymentResponse.razorpay_signature
       };
 
-      console.log('Order data prepared:', orderData);
-
-      // Save to Firebase
-      const ordersRef = ref(firebaseDatabase, 'orders');
-      const newOrderRef = push(ordersRef);
-      const orderId = newOrderRef.key!;
+      // Save order to Firebase AFTER payment success
+      const savedOrderId = await saveOrderToFirebase(orderData);
+      console.log(`✅ Order saved to Firebase after payment: ${savedOrderId}`);
       
-      const orderWithId = {
-        ...orderData,
-        id: orderId,
-        uniqueOrderId: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString(),
-        commissionProcessed: false,
-        creditedUplines: {},
-        updatedAt: new Date().toISOString()
-      };
-      
-      console.log('Saving to Firebase with orderId:', orderId);
-      console.log('Full order object:', orderWithId);
-      
-      await set(newOrderRef, orderWithId);
-      console.log(`✅ Order successfully saved to Firebase: ${orderId}`);
-      
-      return orderId;
-    } catch (error) {
-      console.error('❌ Error saving order to Firebase:', error);
-      console.error('Error details:', error.message);
-      console.error('Error stack:', error.stack);
-      throw error;
-    }
-  };
-
-  // Verify payment and save order
-  const verifyPaymentAndSaveOrder = async (paymentResponse: any) => {
-    setPaymentLoading(true);
-    
-    try {
-      console.log('Verifying payment and saving order...');
-      
-      // 1. First verify the payment was successful
-      if (!paymentResponse.razorpay_payment_id) {
-        throw new Error('No payment ID received');
-      }
-      
-      console.log('Payment verified with ID:', paymentResponse.razorpay_payment_id);
-      
-      // 2. Save the order to Firebase
-      const orderId = await saveOrderAfterPayment(paymentResponse);
-      
-      console.log('Order saved successfully, orderId:', orderId);
-      
-      // 3. Show success toast
       toast({
         title: "Payment Successful! 🎉",
-        description: `Order #${orderId} has been placed successfully.`,
-        duration: 5000,
+        description: `Order ID: ${savedOrderId}`,
       });
       
-      // 4. Process commissions (in background)
+      // Process commissions silently
       try {
-        await processCommissionsAfterPayment(orderId, formData);
-      } catch (commissionError) {
-        console.warn('Commission processing failed, but order saved:', commissionError);
+        await processCommissionsAfterPayment(savedOrderId, orderData);
+      } catch (e) {
+        console.log('Commissions will be processed later');
       }
       
-      // 5. Close modal and redirect
       onClose();
       setTimeout(() => {
-        window.location.href = `/thank-you?order=${orderId}`;
+        window.location.href = `/thank-you?order=${savedOrderId}`;
       }, 1500);
       
-    } catch (error: any) {
-      console.error('❌ Payment verification/order saving failed:', error);
-      
-      // Show error but also check if payment was actually successful
+    } catch (error) {
+      console.error('Error saving order after payment:', error);
       toast({
-        title: "Payment Process Issue",
-        description: "Your payment was successful but we encountered an issue. Please contact support with your payment ID.",
-        variant: "destructive",
-        duration: 10000,
+        title: "Payment Successful",
+        description: "Your payment was successful! Please contact support with your payment ID.",
       });
-      
-      // Still redirect to thank you page with payment ID
       onClose();
       setTimeout(() => {
         window.location.href = `/thank-you?payment=${paymentResponse.razorpay_payment_id}`;
-      }, 2000);
+      }, 1000);
     } finally {
       setPaymentLoading(false);
-    }
-  };
-
-  // Process commissions after payment
-  const processCommissionsAfterPayment = async (orderId: string, formData: any) => {
-    console.log('Starting commission processing for order:', orderId);
-    
-    try {
-      // Combined 10% + ₹100 Bonus for Direct Referral Link
-      if (affiliateId && uid !== affiliateId) {
-        console.log('Processing affiliate bonus for:', affiliateId);
-        
-        try {
-          const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
-          
-          if (referrerSnap.exists()) {
-            console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
-            
-            // Calculate 10% commission
-            const commissionAmount = Math.round(totalAmount * 0.10);
-            const fixedBonusAmount = 100;
-            const totalEarnings = commissionAmount + fixedBonusAmount;
-
-            const commissionDescription = `Combined earnings: 10% commission (₹${commissionAmount}) + ₹${fixedBonusAmount} bonus = ₹${totalEarnings} from ${formData.name}'s purchase of ${product.name}`;
-
-            // Save commission record
-            const commissionsRef = ref(firebaseDatabase, `commissions/${affiliateId}`);
-            const newCommissionRef = push(commissionsRef);
-            await set(newCommissionRef, {
-              affiliateId: affiliateId,
-              affiliateName: 'Direct Referrer',
-              customerId: 'guest',
-              customerName: formData.name,
-              orderId,
-              productName: product.name,
-              purchaseAmount: totalAmount,
-              commissionAmount: totalEarnings,
-              commissionRate: '10% + ₹100 Bonus',
-              level: 1,
-              description: commissionDescription,
-              status: 'completed',
-              type: 'combined_referral_bonus',
-              timestamp: new Date().toISOString(),
-              breakdown: {
-                commission: commissionAmount,
-                fixedBonus: fixedBonusAmount,
-                total: totalEarnings
-              }
-            });
-
-            // Add to wallet
-            const walletRef = ref(firebaseDatabase, `wallets/${affiliateId}`);
-            const transactionRef = push(ref(firebaseDatabase, `transactions/${affiliateId}`));
-            const snap = await get(walletRef);
-            const currentBalance = snap.exists() ? snap.val().balance : 0;
-            const newBalance = currentBalance + totalEarnings;
-
-            await set(walletRef, {
-              balance: newBalance,
-              upiId: snap.exists() ? snap.val().upiId : '',
-              lastUpdated: new Date().toISOString()
-            });
-
-            await set(transactionRef, {
-              amount: totalEarnings,
-              type: 'credit',
-              description: commissionDescription,
-              balanceAfter: newBalance,
-              timestamp: new Date().toISOString(),
-              orderId,
-              status: 'completed'
-            });
-
-            console.log(`✅ Combined bonus given: ₹${totalEarnings} to ${affiliateId}`);
-          }
-        } catch (affiliateError) {
-          console.error('Affiliate commission error:', affiliateError);
-        }
-      }
-
-      // Multi-level commissions (only if buyer is affiliate)
-      if (uid) {
-        try {
-          const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
-          
-          if (affSnap.exists() && affSnap.val().isAffiliate) {
-            console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
-            
-            // Get upline chain
-            const chain = await getUplineChain(uid);
-            
-            for (const upline of chain) {
-              const level = upline.level;
-              const rate = commissionRates[level - 1];
-              const commissionAmount = Math.round(totalAmount * rate);
-              
-              if (commissionAmount > 0) {
-                const description = `Level ${level} commission (${(rate * 100).toFixed(1)}%) from ${formData.name}'s purchase`;
-                
-                // Save commission record
-                const commissionsRef = ref(firebaseDatabase, `commissions/${upline.id}`);
-                const newCommissionRef = push(commissionsRef);
-                await set(newCommissionRef, {
-                  affiliateId: upline.id,
-                  affiliateName: upline.name,
-                  customerId: uid,
-                  customerName: formData.name,
-                  orderId,
-                  productName: product.name,
-                  purchaseAmount: totalAmount,
-                  commissionAmount,
-                  commissionRate: (rate * 100).toFixed(1) + '%',
-                  level,
-                  description,
-                  status: 'completed',
-                  timestamp: new Date().toISOString()
-                });
-
-                // Add to wallet
-                const walletRef = ref(firebaseDatabase, `wallets/${upline.id}`);
-                const transactionRef = push(ref(firebaseDatabase, `transactions/${upline.id}`));
-                const snap = await get(walletRef);
-                const currentBalance = snap.exists() ? snap.val().balance : 0;
-                const newBalance = currentBalance + commissionAmount;
-
-                await set(walletRef, {
-                  balance: newBalance,
-                  upiId: snap.exists() ? snap.val().upiId : '',
-                  lastUpdated: new Date().toISOString()
-                });
-
-                await set(transactionRef, {
-                  amount: commissionAmount,
-                  type: 'credit',
-                  description,
-                  balanceAfter: newBalance,
-                  timestamp: new Date().toISOString(),
-                  orderId,
-                  status: 'completed'
-                });
-
-                console.log(`💰 Level ${level} commission: ₹${commissionAmount} to ${upline.id}`);
-              }
-            }
-          }
-        } catch (mlmError) {
-          console.error('Multi-level commission error:', mlmError);
-        }
-      }
-
-      console.log(`✅ All commissions processed for order: ${orderId}`);
-    } catch (error) {
-      console.error('Commission processing error:', error);
-      // Don't throw error - commissions can fail without affecting order
     }
   };
 
@@ -785,6 +629,10 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     }
 
     try {
+      // Generate a unique order ID locally (not saved to Firebase yet)
+      const tempOrderId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setOrderId(tempOrderId);
+
       const options = {
         key: RAZORPAY_CONFIG.key_id,
         amount: totalAmount * 100, // Convert to paise
@@ -793,8 +641,8 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         description: `Purchase: ${product.name}`,
         image: '/logo.png',
         handler: async function (response: any) {
-          console.log('Payment successful, response:', response);
-          await verifyPaymentAndSaveOrder(response);
+          console.log('Payment successful:', response);
+          await handleSuccessfulPayment(response);
         },
         prefill: {
           name: formData.name,
@@ -805,13 +653,15 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
           address: formData.address,
           product_id: product._id,
           customer_id: customerId,
-          affiliate_id: affiliateId || 'none'
+          affiliate_id: affiliateId || 'none',
+          temp_order_id: tempOrderId
         },
         theme: {
           color: '#b45309',
         },
         modal: {
           ondismiss: function() {
+            setOrderId(null);
             toast({
               title: 'Payment Cancelled',
               description: 'You cancelled the payment process.',
@@ -821,12 +671,12 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         }
       };
 
-      console.log('Opening Razorpay with options:', options);
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.open();
       return true;
     } catch (error) {
       console.error('Razorpay initialization error:', error);
+      setOrderId(null);
       toast({
         title: 'Payment Error',
         description: 'Failed to initialize payment. Please try again.',
@@ -885,11 +735,10 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     setLoading(true);
     
     try {
-      console.log('Starting payment process...');
       const paymentInitiated = await initiateRazorpayPayment();
       
       if (!paymentInitiated) {
-        console.error('Payment initiation failed');
+        setLoading(false);
       }
 
     } catch (error: any) {
@@ -899,7 +748,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         description: error.message || "Failed to initiate payment.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -1061,7 +909,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               </div>
               <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
                 <p className="text-xs text-yellow-800">
-                  <strong>Note:</strong> Order will be created and saved only after successful payment confirmation.
+                  <strong>Note:</strong> Your order will only be created and saved after successful payment.
                 </p>
               </div>
             </div>
@@ -1076,13 +924,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                !razorpayLoaded ? 'Loading Payment...' : 
                `Pay Securely ₹${totalAmount.toLocaleString()}`}
             </Button>
-            
-            {paymentLoading && (
-              <div className="text-center text-sm text-blue-600">
-                <p>Processing your order... Please wait.</p>
-                <p className="text-xs text-gray-500">Order will be saved after payment confirmation.</p>
-              </div>
-            )}
           </form>
 
           <div className="text-center text-xs text-gray-500">
