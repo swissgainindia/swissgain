@@ -5,18 +5,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Pencil, Trash2, Plus } from "lucide-react";
 import ProductForm from "./product-form";
-
 export default function AdminProducts() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const { toast } = useToast();
-
   useEffect(() => {
     loadProducts();
   }, []);
-
   const loadProducts = async () => {
     try {
       const data = await fetchProducts();
@@ -31,10 +28,8 @@ export default function AdminProducts() {
       setLoading(false);
     }
   };
-
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
-
     try {
       await deleteProduct(id);
       toast({
@@ -50,37 +45,30 @@ export default function AdminProducts() {
       });
     }
   };
-
   const handleEdit = (product: any) => {
     setEditingProduct(product);
     setShowForm(true);
   };
-
   const handleFormClose = () => {
     setShowForm(false);
     setEditingProduct(null);
     loadProducts();
   };
-
   if (showForm) {
     return <ProductForm product={editingProduct} onClose={handleFormClose} />;
   }
-
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
-
   return (
     <div className="space-y-6">
-
-      
+     
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Products</h2>
         <Button onClick={() => setShowForm(true)}>
           <Plus className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
-
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -95,7 +83,9 @@ export default function AdminProducts() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.map((product) => (
+            {products.map((product) => {
+              const isInStock = product.inStock && (product.stockQuantity || 0) > 0;
+              return (
               <TableRow key={product._id}>
                 <TableCell>
                   <img
@@ -107,7 +97,7 @@ export default function AdminProducts() {
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.category}</TableCell>
                 <TableCell>₹{product.price}</TableCell>
-                <TableCell>{product.inStock ? "In Stock" : "Out of Stock"}</TableCell>
+                <TableCell>{isInStock ? "In Stock" : "Out of Stock"}</TableCell>
                 {/* <TableCell>{product.sales || 0}</TableCell> */}
                 <TableCell>
                   <div className="flex gap-2">
@@ -128,7 +118,7 @@ export default function AdminProducts() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
       </div>

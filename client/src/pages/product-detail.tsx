@@ -15,7 +15,6 @@ import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, 
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
-
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -27,7 +26,6 @@ const firebaseConfig = {
   appId: "1:1062016445247:web:bf559ce1ed7f17e2ca418a",
   measurementId: "G-VTKPWVEY0S"
 };
-
 // Initialize Firebase only once
 let database: any = null;
 const initializeFirebase = () => {
@@ -48,13 +46,11 @@ const initializeFirebase = () => {
   }
 };
 const firebaseDatabase = initializeFirebase();
-
 // Razorpay Configuration
 const RAZORPAY_CONFIG = {
   key_id: "rzp_live_RjxoVsUGVyJUhQ",
   key_secret: "shF22XqtflD64nRd2GdzCYoT",
 };
-
 // Load Razorpay script
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -62,12 +58,12 @@ const loadRazorpayScript = () => {
       resolve(false);
       return;
     }
-    
+   
     if (window.Razorpay) {
       resolve(true);
       return;
     }
-    
+   
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.onload = () => resolve(true);
@@ -75,10 +71,8 @@ const loadRazorpayScript = () => {
     document.body.appendChild(script);
   });
 };
-
 // Commission rates (total ~24.4%)
 const commissionRates = [0.10, 0.05, 0.025, 0.02, 0.015, 0.01, 0.008, 0.006, 0.005, 0.005];
-
 interface OrderData {
   productId: string;
   affiliateId?: string;
@@ -114,7 +108,6 @@ interface OrderData {
   razorpayOrderId?: string;
   razorpaySignature?: string;
 }
-
 // Customer ID Helpers
 const generateUniqueCustomerId = () => {
   if (typeof window === 'undefined') return "default_customer";
@@ -128,15 +121,12 @@ const generateUniqueCustomerId = () => {
   }
   return customerId;
 };
-
 const getOrCreateCustomerId = () => generateUniqueCustomerId();
-
 const getCookie = (name: string) => {
   if (typeof document === 'undefined') return null;
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? m[2] : null;
 };
-
 // Upline Chain
 const getUplineChain = async (affiliateId: string, maxLevels = 10): Promise<any[]> => {
   const chain = [];
@@ -156,14 +146,13 @@ const getUplineChain = async (affiliateId: string, maxLevels = 10): Promise<any[
   }
   return chain;
 };
-
 // Save Order
 const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
   try {
     const ordersRef = ref(firebaseDatabase, 'orders');
     const newOrderRef = push(ordersRef);
     const orderId = newOrderRef.key!;
-    
+   
     const orderWithId = {
       ...orderData,
       id: orderId,
@@ -172,7 +161,7 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
       commissionProcessed: false,
       creditedUplines: {}
     };
-    
+   
     await set(newOrderRef, orderWithId);
     return orderId;
   } catch (error) {
@@ -180,7 +169,6 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
     throw error;
   }
 };
-
 // Update Order Payment Status
 const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
   try {
@@ -193,7 +181,7 @@ const updateOrderPaymentStatus = async (orderId: string, paymentId: string, stat
       paymentUpdatedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+   
     console.log('Firebase update data:', updates);
     await update(orderRef, updates);
     console.log('Firebase update successful');
@@ -209,7 +197,6 @@ const updateOrderPaymentStatus = async (orderId: string, paymentId: string, stat
     throw error;
   }
 };
-
 // Save Commission Record
 const saveCommissionRecord = async (commissionData: any): Promise<void> => {
   try {
@@ -227,7 +214,6 @@ const saveCommissionRecord = async (commissionData: any): Promise<void> => {
     throw error;
   }
 };
-
 // Add to Wallet
 const addCommissionToWallet = async (affiliateId: string, amount: number, description: string, orderId: string): Promise<void> => {
   try {
@@ -235,15 +221,13 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
     const transactionRef = push(ref(firebaseDatabase, `transactions/${affiliateId}`));
     const snap = await get(walletRef);
     const currentBalance = snap.exists() ? snap.val().balance : 0;
-   
+  
     const newBalance = currentBalance + amount;
-
     await set(walletRef, {
       balance: newBalance,
       upiId: snap.exists() ? snap.val().upiId : '',
       lastUpdated: new Date().toISOString()
     });
-
     await set(transactionRef, {
       amount,
       type: 'credit',
@@ -253,14 +237,12 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
       orderId,
       status: 'completed'
     });
-
     console.log(`💰 Wallet updated for ${affiliateId}: +₹${amount} = ₹${newBalance}`);
   } catch (error) {
     console.error('Error adding to wallet:', error);
     throw error;
   }
 };
-
 // Update Referral After Purchase
 const updateReferralAfterPurchase = async (affiliateId: string, customerId: string, customerName: string, customerEmail: string, earnings: number, productName: string, orderId: string): Promise<void> => {
   try {
@@ -286,7 +268,6 @@ const updateReferralAfterPurchase = async (affiliateId: string, customerId: stri
     throw error;
   }
 };
-
 // Update Referral Stats
 const updateReferralStats = async (affiliateId: string, amount: number): Promise<void> => {
   try {
@@ -302,7 +283,6 @@ const updateReferralStats = async (affiliateId: string, amount: number): Promise
     console.error('Error updating stats:', error);
   }
 };
-
 // Combined 10% + ₹100 Fixed Bonus for Direct Referral Link Purchase
 const giveCombinedReferralBonus = async (directReferrerId: string, customerName: string, productName: string, orderId: string, totalAmount: number): Promise<void> => {
   try {
@@ -310,11 +290,9 @@ const giveCombinedReferralBonus = async (directReferrerId: string, customerName:
     const commissionAmount = Math.round(totalAmount * 0.10);
     const fixedBonusAmount = 100;
     const totalEarnings = commissionAmount + fixedBonusAmount;
-
     const transactionDescription = `Level 1 commission (10.0%) from ${customerName}'s purchase of ${productName} + ₹${fixedBonusAmount} fixed affiliate bonus`;
-    
+   
     const commissionDescription = `Combined earnings: 10% commission (₹${commissionAmount}) + ₹${fixedBonusAmount} bonus = ₹${totalEarnings} from ${customerName}'s purchase of ${productName}`;
-
     await saveCommissionRecord({
       affiliateId: directReferrerId,
       affiliateName: 'Direct Referrer',
@@ -342,45 +320,40 @@ const giveCombinedReferralBonus = async (directReferrerId: string, customerName:
         total: totalEarnings
       }
     });
-
     await addCommissionToWallet(directReferrerId, totalEarnings, transactionDescription, orderId);
     await updateReferralStats(directReferrerId, totalEarnings);
-    
+   
     console.log(`✅ Combined bonus given: ₹${totalEarnings} (₹${commissionAmount} + ₹${fixedBonusAmount}) to ${directReferrerId}`);
   } catch (error) {
     console.error('❌ Failed to give combined referral bonus:', error);
     throw error;
   }
 };
-
 // Process multi-level commissions
 const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: string, totalAmount: number, formData: any, product: any) => {
   try {
     const chain = await getUplineChain(buyerAffiliateId);
     if (chain.length === 0) return;
-
     const creditedUplines = chain.reduce((acc, u) => ({ ...acc, [u.id]: true }), {});
     await update(ref(firebaseDatabase, `orders/${orderId}`), { creditedUplines });
-
     for (const upline of chain) {
       const level = upline.level;
       const rate = commissionRates[level - 1];
-      
+     
       let commissionAmount = Math.round(totalAmount * rate);
       let fixedBonusAmount = 0;
-      
+     
       if (level === 1) {
         fixedBonusAmount = 100;
         commissionAmount += fixedBonusAmount;
       }
-      
+     
       let description = '';
       if (level === 1) {
         description = `Level ${level} commission (${(rate * 100).toFixed(1)}%) from ${formData.name}'s purchase of ${product.name} + ₹${fixedBonusAmount} fixed affiliate bonus`;
       } else {
         description = `Level ${level} commission (${(rate * 100).toFixed(1)}%) from ${formData.name}'s purchase`;
       }
-
       await saveCommissionRecord({
         affiliateId: upline.id,
         affiliateName: upline.name,
@@ -405,13 +378,10 @@ const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: s
           }
         })
       });
-
       await addCommissionToWallet(upline.id, commissionAmount, description, orderId);
       await updateReferralStats(upline.id, commissionAmount);
-
       console.log(`💰 Level ${level} commission: ₹${commissionAmount} (${rate * 100}% ${level === 1 ? '+ ₹100 bonus' : ''}) to ${upline.id}`);
     }
-
     if (chain.length > 0) {
       const directComm = Math.round(totalAmount * 0.10) + 100;
       await updateReferralAfterPurchase(chain[0].id, buyerAffiliateId, formData.name, formData.email, directComm, product.name, orderId);
@@ -421,7 +391,6 @@ const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: s
     throw error;
   }
 };
-
 // Checkout Modal with Razorpay Integration
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -432,7 +401,6 @@ interface CheckoutModalProps {
   customerId: string;
   uid?: string;
 }
-
 function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -442,7 +410,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
   const totalAmount = product.price * quantity;
-
   useEffect(() => {
     console.log('CheckoutModal state:', {
       isOpen,
@@ -453,11 +420,10 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       totalAmount
     });
   }, [isOpen, loading, paymentLoading, razorpayLoaded, formData, totalAmount]);
-
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
-      
+     
       // Load Razorpay script when modal opens
       loadRazorpayScript().then((loaded) => {
         setRazorpayLoaded(!!loaded);
@@ -471,14 +437,11 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
     }
   }, [isOpen]);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
-
   // Initiate Razorpay Payment
   const initiateRazorpayPayment = async (orderData: OrderData) => {
     if (!razorpayLoaded) {
@@ -489,7 +452,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
       return false;
     }
-
     if (!window.Razorpay) {
       toast({
         title: 'Payment Error',
@@ -498,7 +460,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
       return false;
     }
-
     const options = {
       key: RAZORPAY_CONFIG.key_id,
       amount: totalAmount * 100, // Convert to paise
@@ -517,16 +478,12 @@ handler: async function (response: any) {
       razorpaySignature: response.razorpay_signature || '',
       createdAt: new Date().toISOString(),
     };
-
     const orderId = await saveOrderToFirebase(paidOrderData);
-
     await processCommissionsAfterPayment(orderId, paidOrderData);
-
     toast({
       title: "Payment Successful 🎉",
       description: `Order ID: ${orderId}`,
     });
-
     onClose();
     window.location.href = `/thank-you`;
   } catch (err) {
@@ -537,7 +494,6 @@ handler: async function (response: any) {
     });
   }
 }
-
 ,
       prefill: {
         name: formData.name,
@@ -550,7 +506,6 @@ handler: async function (response: any) {
   customer_id: customerId,
   affiliate_id: affiliateId || 'none'
 },
-
       theme: {
         color: '#b45309',
       },
@@ -564,7 +519,6 @@ handler: async function (response: any) {
         }
       }
     };
-
     try {
       const razorpayInstance = new window.Razorpay(options);
       razorpayInstance.open();
@@ -579,20 +533,19 @@ handler: async function (response: any) {
       return false;
     }
   };
-
   // Process commissions after payment
   const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
     console.log('Starting commission processing for order:', orderId);
     console.log('Order data:', orderData);
     console.log('Form data:', formData);
-    
+   
     try {
       // Combined 10% + ₹100 Bonus for Direct Referral Link
       if (affiliateId && uid !== affiliateId) {
         console.log('Checking affiliate:', affiliateId);
         const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
         console.log('Affiliate exists:', referrerSnap.exists());
-        
+       
         if (referrerSnap.exists()) {
           console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
           await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
@@ -602,7 +555,6 @@ handler: async function (response: any) {
       } else {
         console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
       }
-
       // Multi-level commissions (only if buyer is affiliate)
       if (uid) {
         console.log('Checking if buyer is affiliate:', uid);
@@ -611,7 +563,7 @@ handler: async function (response: any) {
           exists: affSnap.exists(),
           isAffiliate: affSnap.exists() ? affSnap.val().isAffiliate : false
         });
-        
+       
         if (affSnap.exists() && affSnap.val().isAffiliate) {
           console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
           await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
@@ -619,7 +571,6 @@ handler: async function (response: any) {
           console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
         }
       }
-
       console.log(`✅ All commissions processed for order: ${orderId}`);
     } catch (error) {
       console.error('Commission processing error details:', {
@@ -632,20 +583,15 @@ handler: async function (response: any) {
       throw error;
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-
   if (!formData.name || !formData.email || !formData.phone || !formData.address) {
     toast({ title: "Incomplete Form", variant: "destructive" });
     return;
   }
-
   setLoading(true);
-
   try {
     const purchaseCustomerId = generatePurchaseCustomerId();
-
     const orderData: OrderData = {
       productId: product._id,
       ...(affiliateId && { affiliateId }),
@@ -663,10 +609,8 @@ handler: async function (response: any) {
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
-
     // 🔥 Directly open Razorpay
     await initiateRazorpayPayment(orderData);
-
   } catch (err: any) {
     toast({
       title: "Checkout Failed",
@@ -677,8 +621,6 @@ handler: async function (response: any) {
     setLoading(false);
   }
 };
-
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
@@ -714,7 +656,6 @@ handler: async function (response: any) {
               </div>
             </div>
           </div>
-
           {affiliateId && (
             <div className="bg-green-50 p-3 rounded-lg border border-green-200">
               <p className="text-sm font-medium text-green-800">Referral Purchase Detected</p>
@@ -723,14 +664,12 @@ handler: async function (response: any) {
               </p>
             </div>
           )}
-
           {uid && (
             <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
               <p className="text-sm font-medium text-blue-800">Affiliate Purchase</p>
               <p className="text-xs text-blue-700 mt-1">Your upline will earn commissions on this purchase.</p>
             </div>
           )}
-
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
             <p className="text-sm font-medium text-blue-800">Your Customer ID</p>
             <div className="mt-2 flex items-center justify-between bg-white p-2 rounded border">
@@ -738,7 +677,6 @@ handler: async function (response: any) {
               <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(customerId)}>Copy</Button>
             </div>
           </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Full Name *</Label>
@@ -770,7 +708,7 @@ handler: async function (response: any) {
               <Label>PIN Code *</Label>
               <Input name="pincode" value={formData.pincode} onChange={handleInputChange} required placeholder="6-digit PIN" />
             </div>
-            
+           
             <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="h-4 w-4 text-primary" />
@@ -789,19 +727,17 @@ handler: async function (response: any) {
                 </div>
               </div>
             </div>
-
-            <Button 
-              type="submit" 
-              className="w-full gradient-primary text-primary-foreground py-3" 
+            <Button
+              type="submit"
+              className="w-full gradient-primary text-primary-foreground py-3"
               disabled={loading || paymentLoading || !razorpayLoaded}
             >
-              {paymentLoading ? 'Processing Payment...' : 
-               loading ? 'Creating Order...' : 
-               !razorpayLoaded ? 'Loading Payment...' : 
+              {paymentLoading ? 'Processing Payment...' :
+               loading ? 'Creating Order...' :
+               !razorpayLoaded ? 'Loading Payment...' :
                `Pay Securely ₹${totalAmount.toLocaleString()}`}
             </Button>
           </form>
-
           <div className="text-center text-xs text-gray-500">
             By completing your purchase, you agree to our Terms of Service and Privacy Policy.
           </div>
@@ -810,10 +746,8 @@ handler: async function (response: any) {
     </Dialog>
   );
 }
-
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
 const BASE_IMAGE_URL = 'https://swissgainindia.com';
-
 export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
   const productId = params?.id;
@@ -825,7 +759,6 @@ export default function ProductDetail() {
   const affiliateId = getAffiliateIdFromUrl();
   const uid = getCookie('swissgain_uid') || undefined;
   const customerId = uid || getOrCreateCustomerId();
-
   const [product, setProduct] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -835,7 +768,6 @@ export default function ProductDetail() {
   const { updateData } = useLocalStorage();
   const { toast } = useToast();
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
-
   useEffect(() => {
     const fetchProduct = async () => {
       if (!productId) return;
@@ -850,7 +782,6 @@ export default function ProductDetail() {
             images: allImages.length > 0 ? allImages : [FALLBACK_IMAGE],
             affiliateId
           });
-
           const relatedRes = await axios.get(`/api/products?category=${res.data.category}`);
           setRelatedProducts(relatedRes.data.filter((p: any) => p._id !== res.data._id).slice(0, 4).map((p: any) => {
             const pImages = [p.image ? (p.image.startsWith('http') ? p.image : `${BASE_IMAGE_URL}${p.image}`) : null, ...(p.images || []).map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)].filter(Boolean);
@@ -866,21 +797,27 @@ export default function ProductDetail() {
     };
     fetchProduct();
   }, [productId, affiliateId]);
-
+  const isInStock = product?.inStock && (product?.stockQuantity || 0) > 0;
   const handleAddToCart = () => {
-    if (!product) return;
+    if (!product || !isInStock) return;
     updateData(addProductToCart.bind(null, product, quantity));
-    toast({ 
-      title: 'Added to Cart', 
-      description: `${quantity} ${product.name}(s) added.` 
+    toast({
+      title: 'Added to Cart',
+      description: `${quantity} ${product.name}(s) added.`
     });
   };
-
   const handleBuyNow = () => {
+    if (!isInStock) {
+      toast({
+        title: 'Out of Stock',
+        description: 'This product is currently out of stock.',
+        variant: 'destructive',
+      });
+      return;
+    }
     handleAddToCart();
     setIsCheckoutOpen(true);
   };
-
   if (loading) return <div className="py-20 text-center text-xl">Loading product...</div>;
   if (error || !product) return (
     <div className="py-20 bg-white min-h-screen flex items-center justify-center text-center">
@@ -894,7 +831,6 @@ export default function ProductDetail() {
       </div>
     </div>
   );
-
   return (
     <div className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -904,38 +840,41 @@ export default function ProductDetail() {
           <span className="capitalize">{product.category}</span> <span>/</span>
           <span className="text-foreground">{product.name}</span>
         </nav>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
           <div className="space-y-4">
             <div className="relative">
-              <img 
-                src={product.images[selectedImageIndex] || FALLBACK_IMAGE} 
-                alt={product.name} 
-                className="rounded-xl shadow-lg w-full h-96 object-cover" 
-                onError={(e) => e.currentTarget.src = FALLBACK_IMAGE} 
+              <img
+                src={product.images[selectedImageIndex] || FALLBACK_IMAGE}
+                alt={product.name}
+                className="rounded-xl shadow-lg w-full h-96 object-cover"
+                onError={(e) => e.currentTarget.src = FALLBACK_IMAGE}
               />
               {product.discount && (
                 <Badge variant="destructive" className="absolute top-4 left-4 text-lg px-3 py-1">
                   {product.discount}% OFF
                 </Badge>
               )}
+              {!isInStock && (
+                <Badge variant="secondary" className="absolute top-4 right-4 text-lg px-3 py-1">
+                  Out of Stock
+                </Badge>
+              )}
             </div>
             {product.images.length > 1 && (
               <div className="grid grid-cols-4 gap-4">
                 {product.images.map((img: string, i: number) => (
-                  <img 
-                    key={i} 
-                    src={img} 
-                    alt="" 
-                    className={`rounded-lg cursor-pointer h-20 object-cover ${selectedImageIndex === i ? 'ring-2 ring-primary' : ''}`} 
-                    onClick={() => setSelectedImageIndex(i)} 
-                    onError={(e) => e.currentTarget.src = FALLBACK_IMAGE} 
+                  <img
+                    key={i}
+                    src={img}
+                    alt=""
+                    className={`rounded-lg cursor-pointer h-20 object-cover ${selectedImageIndex === i ? 'ring-2 ring-primary' : ''}`}
+                    onClick={() => setSelectedImageIndex(i)}
+                    onError={(e) => e.currentTarget.src = FALLBACK_IMAGE}
                   />
                 ))}
               </div>
             )}
           </div>
-
           <div className="space-y-8">
             <div>
               <Badge variant="outline" className="mb-4 capitalize">{product.category}</Badge>
@@ -952,9 +891,9 @@ export default function ProductDetail() {
               <div className="flex items-center space-x-2 mb-6">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
-                    <Star 
-                      key={i} 
-                      className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`} 
+                    <Star
+                      key={i}
+                      className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`}
                     />
                   ))}
                 </div>
@@ -964,52 +903,59 @@ export default function ProductDetail() {
               </div>
               <p className="text-muted-foreground text-lg mb-6">{product.description}</p>
             </div>
-
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
                 <label className="text-sm font-medium">Quantity:</label>
                 <div className="flex items-center border rounded-lg">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)}
+                    disabled={!isInStock}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <Input 
-                    type="number" 
-                    value={quantity} 
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} 
-                    className="w-16 text-center border-0" 
+                  <Input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-16 text-center border-0"
+                    disabled={!isInStock}
                   />
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setQuantity(q => q + 1)}
+                    disabled={!isInStock}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  onClick={handleAddToCart} 
-                  className="flex-1 gradient-primary text-primary-foreground py-3" 
+                <Button
+                  onClick={handleAddToCart}
+                  className="flex-1 gradient-primary text-primary-foreground py-3"
                   size="lg"
+                  disabled={!isInStock}
                 >
                   <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
                 </Button>
-                <Button 
-                  onClick={handleBuyNow} 
-                  className="flex-1 gradient-gold text-accent-foreground py-3" 
+                <Button
+                  onClick={handleBuyNow}
+                  className="flex-1 gradient-gold text-accent-foreground py-3"
                   size="lg"
+                  disabled={!isInStock}
                 >
                   <Zap className="mr-2 h-5 w-5" /> Buy Now
                 </Button>
               </div>
+              {!isInStock && (
+                <Badge variant="secondary" className="w-full py-3 justify-center">
+                  Out of Stock - Notify Me When Available
+                </Badge>
+              )}
             </div>
-
             <div className="grid grid-cols-3 gap-4 pt-6 border-t">
               <div className="text-center">
                 <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
@@ -1026,7 +972,6 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
-
         <Tabs defaultValue="features" className="mb-16">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="features">Features</TabsTrigger>
@@ -1068,9 +1013,9 @@ export default function ProductDetail() {
               <div className="text-4xl mb-2">{(product.rating || 0).toFixed(1)}</div>
               <div className="flex justify-center mb-2">
                 {[...Array(5)].map((_, i) => (
-                  <Star 
-                    key={i} 
-                    className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`} 
+                  <Star
+                    key={i}
+                    className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`}
                   />
                 ))}
               </div>
@@ -1078,7 +1023,6 @@ export default function ProductDetail() {
             </div>
           </TabsContent>
         </Tabs>
-
         {relatedProducts.length > 0 && (
           <div className="mb-16">
             <h2 className="text-3xl font-bold mb-8">Related Products</h2>
@@ -1089,7 +1033,6 @@ export default function ProductDetail() {
             </div>
           </div>
         )}
-
         <div className="bg-gradient-to-r from-primary to-yellow-700 rounded-2xl p-8 text-white text-center mt-16">
           <h3 className="text-2xl font-bold mb-4">Interested in Earning?</h3>
           <p className="mb-6 max-w-2xl mx-auto">Join our affiliate program and earn commissions on every sale!</p>
@@ -1100,7 +1043,6 @@ export default function ProductDetail() {
           </Link>
         </div>
       </div>
-
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
@@ -1113,7 +1055,6 @@ export default function ProductDetail() {
     </div>
   );
 }
-
 // Add Razorpay type declaration
 declare global {
   interface Window {
