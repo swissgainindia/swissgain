@@ -30,22 +30,7 @@ const ThankYou: React.FC = () => {
           If you have any questions, feel free to contact our support team.
         </p>
 
-        {/* Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <a
-            href="/"
-            className="w-full inline-flex justify-center items-center rounded-lg bg-black text-white px-5 py-3 text-sm font-medium hover:bg-gray-800 transition"
-          >
-            Go to Home
-          </a>
-
-          <a
-            href="/orders"
-            className="w-full inline-flex justify-center items-center rounded-lg border border-gray-300 text-gray-700 px-5 py-3 text-sm font-medium hover:bg-gray-100 transition"
-          >
-            View Orders
-          </a>
-        </div>
+       
       </div>
     </div>
   );
