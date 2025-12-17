@@ -177,7 +177,7 @@ const updateOrderPaymentStatus = async (orderId: string, paymentId: string, stat
     const updates = {
       paymentId,
       paymentStatus: status,
-      status: status === 'paid' ? 'confirmed' : 'cancelled',
+      status: status === 'paid' ? 'pending' : 'cancelled',
       paymentUpdatedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -471,7 +471,7 @@ handler: async function (response: any) {
   try {
     const paidOrderData: OrderData = {
       ...orderData,
-      status: 'confirmed',
+      status: 'pending',
       paymentStatus: 'paid',
       paymentId: response.razorpay_payment_id,
       razorpayOrderId: response.razorpay_order_id || '',
