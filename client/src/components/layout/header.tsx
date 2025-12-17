@@ -47,9 +47,9 @@ export default function NecklaceEcommerceHeader() {
   const [filteredSuggestions, setFilteredSuggestions] = useState([]);
 
   const promoTexts = [
-    "Free Shipping on Orders Over Rs 50",
-    "New Collection Just Arrived - Shop Now!",
-    "Refer a Friend & Get 20% Off Your Next Order"
+    "Fresh Styles Have Landed – Explore Now",
+    "Discover Our Latest Collection",
+    "New Arrivals You’ll Love"
   ];
 
   /* ⭐ Fetch all products for search */
