@@ -438,10 +438,10 @@ export default function AdminUsers() {
   // Filter users based on search and filters
   const filteredUsers = users.filter(user => {
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.userId.toLowerCase().includes(searchTerm.toLowerCase());
+      (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.phone || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.userId || '').toLowerCase().includes(searchTerm.toLowerCase());
   
     const matchesStatus = statusFilter === "all" || user.status === statusFilter;
     const matchesRank = rankFilter === "all" || user.rank.toString() === rankFilter;
@@ -451,18 +451,18 @@ export default function AdminUsers() {
   // Filter sales based on search
   const filteredSales = allSales.filter(sale => {
     const matchesSearch =
-      sale.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.customerInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.affiliateId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.customerInfo.email.toLowerCase().includes(searchTerm.toLowerCase());
+      (sale.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sale.customerInfo?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sale.affiliateId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sale.customerInfo?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
   
     return matchesSearch;
   });
   // Filter products based on search
   const filteredProducts = allProducts.filter(product => {
     const matchesSearch =
-      product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.affiliateId.toLowerCase().includes(searchTerm.toLowerCase());
+      (product.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.affiliateId || '').toLowerCase().includes(searchTerm.toLowerCase());
   
     return matchesSearch;
   });
@@ -729,7 +729,7 @@ export default function AdminUsers() {
                         return (
                           <TableRow key={user.id}>
                             <TableCell className="font-mono text-xs">
-                              {user.userId.substring(0, 8)}...
+                              {(user.userId || '').substring(0, 8)}...
                             </TableCell>
                             <TableCell>
                               <div>
@@ -863,7 +863,7 @@ export default function AdminUsers() {
                       filteredSales.map((sale) => (
                         <TableRow key={sale.id}>
                           <TableCell className="font-mono text-xs">
-                            {sale.id.substring(0, 8)}...
+                            {(sale.id || '').substring(0, 8)}...
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-3">
@@ -883,7 +883,7 @@ export default function AdminUsers() {
                           <TableCell>
                             {sale.affiliateId ? (
                               <Badge variant="outline" className="text-xs">
-                                {sale.affiliateId.substring(0, 8)}...
+                                {(sale.affiliateId || '').substring(0, 8)}...
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground text-xs">Direct</span>
@@ -963,12 +963,12 @@ export default function AdminUsers() {
                         return (
                           <TableRow key={`${product.productId}-${product.affiliateId}`}>
                             <TableCell className="font-mono text-xs">
-                              {product.productId.substring(0, 8)}...
+                              {(product.productId || '').substring(0, 8)}...
                             </TableCell>
                             <TableCell className="font-medium">{product.productName}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
-                                {product.affiliateId.substring(0, 8)}...
+                                {(product.affiliateId || '').substring(0, 8)}...
                               </Badge>
                             </TableCell>
                             <TableCell>₹{product.price.toLocaleString()}</TableCell>
