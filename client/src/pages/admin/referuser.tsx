@@ -116,17 +116,21 @@ export default function AdminReferralDashboard() {
   const buildChain = (uid: string, affiliates: any) => {
     const upline: any[] = [];
     let current = affiliates[uid];
+    let level = 1;
     while (current && current.referredById) {
       const referrer = affiliates[current.referredById];
       if (referrer) {
-        upline.unshift({
+        upline.push({
           uid: current.referredById,
           name: referrer.name || 'Unknown',
-          level: upline.length + 1
+          level
         });
         current = referrer;
+        level++;
       } else break;
     }
+    // Reverse to show immediate upline first (level 1) to top
+    upline.reverse();
 
     const downline: any[] = [];
     const buildDownline = (refUid: string, level: number) => {
@@ -263,13 +267,15 @@ export default function AdminReferralDashboard() {
                   <CardTitle>All Affiliates</CardTitle>
                   <CardDescription>{filteredUsers.length} users {searchUsers && `matching "${searchUsers}"`}</CardDescription>
                 </div>
-                <Input
-                  placeholder="Search by name, email, or ID..."
-                  value={searchUsers}
-                  onChange={(e) => setSearchUsers(e.target.value)}
-                  className="w-80"
-                  prefix={<Search className="h-4 w-4 text-muted-foreground" />}
-                />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, or ID..."
+                    value={searchUsers}
+                    onChange={(e) => setSearchUsers(e.target.value)}
+                    className="w-80 pl-10"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -286,23 +292,79 @@ export default function AdminReferralDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.map((user: any) => (
-                      <TableRow key={user.uid}>
-                        <TableCell className="font-mono text-xs">{user.uid.slice(0, 10)}...</TableCell>
-                        <TableCell className="font-medium">{user.name || 'N/A'}</TableCell>
-                        <TableCell className="text-sm">{user.email || user.phone || '—'}</TableCell>
-                        <TableCell>{formatDate(user.joinDate)}</TableCell>
-                        <TableCell className="font-bold text-green-600">₹{(user.totalEarnings || 0).toLocaleString()}</TableCell>
-                        <TableCell>{user.totalSales || 0}</TableCell>
-                        <TableCell>{(user.referrals || []).length}</TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm" onClick={() => toggleChain(user.uid)}>
-                            {expandedChains.has(user.uid) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            Chain
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredUsers.map((user: any) => {
+                      const chain = buildChain(user.uid, allAffiliates);
+                      return (
+                        <>
+                          <TableRow key={user.uid}>
+                            <TableCell className="font-mono text-xs">{user.uid.slice(0, 10)}...</TableCell>
+                            <TableCell className="font-medium">{user.name || 'N/A'}</TableCell>
+                            <TableCell className="text-sm">{user.email || user.phone || '—'}</TableCell>
+                            <TableCell>{formatDate(user.joinDate)}</TableCell>
+                            <TableCell className="font-bold text-green-600">₹{(user.totalEarnings || 0).toLocaleString()}</TableCell>
+                            <TableCell>{user.totalSales || 0}</TableCell>
+                            <TableCell>{(user.referrals || []).length}</TableCell>
+                            <TableCell>
+                              <Button variant="outline" size="sm" onClick={() => toggleChain(user.uid)}>
+                                {expandedChains.has(user.uid) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                Chain
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {expandedChains.has(user.uid) && (
+                            <>
+                              {chain.upline.length > 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={8} className="p-0">
+                                    <div className="bg-green-50 border-t">
+                                      <div className="px-4 py-3 border-b">
+                                        <h5 className="font-semibold flex items-center gap-2 text-green-600">
+                                          <ArrowUpRight className="h-4 w-4" /> Upline ({chain.upline.length})
+                                        </h5>
+                                      </div>
+                                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                                        {chain.upline.map((u: any, i: number) => (
+                                          <div key={i} className="flex justify-between items-center px-4 py-2 text-sm">
+                                            <span className="font-medium">{u.name}</span>
+                                            <Badge variant="secondary" className="text-xs">L{u.level}</Badge>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                              {chain.downline.length > 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={8} className="p-0">
+                                    <div className="bg-blue-50 border-t">
+                                      <div className="px-4 py-3 border-b">
+                                        <h5 className="font-semibold flex items-center gap-2 text-blue-600">
+                                          <ArrowDownRight className="h-4 w-4" /> Downline ({chain.downline.length})
+                                        </h5>
+                                      </div>
+                                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                                        {chain.downline.slice(0, 10).map((d: any, i: number) => (
+                                          <div key={i} className="flex justify-between items-center px-4 py-2 text-sm">
+                                            <span className="font-medium">{d.name}</span>
+                                            <Badge variant="outline" className="text-xs">L{d.level}</Badge>
+                                          </div>
+                                        ))}
+                                        {chain.downline.length > 10 && (
+                                          <div className="px-4 py-2 text-center text-sm text-muted-foreground">
+                                            ... and {chain.downline.length - 10} more
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          )}
+                        </>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -317,12 +379,15 @@ export default function AdminReferralDashboard() {
                   <CardTitle>Referral Chains</CardTitle>
                   <CardDescription>View complete upline & downline for each user</CardDescription>
                 </div>
-                <Input
-                  placeholder="Search user to view chain..."
-                  value={searchChains}
-                  onChange={(e) => setSearchChains(e.target.value)}
-                  className="w-80"
-                />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search user to view chain..."
+                    value={searchChains}
+                    onChange={(e) => setSearchChains(e.target.value)}
+                    className="w-80 pl-10"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
@@ -398,12 +463,15 @@ export default function AdminReferralDashboard() {
                   <CardTitle>Global Commissions</CardTitle>
                   <CardDescription>All commission payouts across the network</CardDescription>
                 </div>
-                <Input
-                  placeholder="Search by affiliate, customer, or product..."
-                  value={searchCommissions}
-                  onChange={(e) => setSearchCommissions(e.target.value)}
-                  className="w-80"
-                />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by affiliate, customer, or product..."
+                    value={searchCommissions}
+                    onChange={(e) => setSearchCommissions(e.target.value)}
+                    className="w-80 pl-10"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
