@@ -323,7 +323,7 @@ export default function Affiliate() {
       const userRef = ref(database, `affiliates/${userId}`);
       const generatedReferralCode = generateReferralCode(userDetails.name, userId);
     
-      const userDataToSave = {
+      const userData = {
         uid: userId,
         name: userDetails.name,
         email: userDetails.email,
@@ -334,15 +334,14 @@ export default function Affiliate() {
         joinDate: new Date().toISOString(),
         referralCode: generatedReferralCode,
         referralLink: `${window.location.origin}/affiliate?ref=${generatedReferralCode}`,
-        hasPaidMembership: true,
-        hasPurchasedProduct: false,
+        // Keep it simple like the working version - no payment object
         ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
       };
      
-      await set(userRef, userDataToSave);
+      await set(userRef, userData);
      
       // Login the user immediately after registration
-      login(userDataToSave);
+      login(userData);
      
       // Track referral if refCode exists and referrerId is found
       if (refCode && referrerId) {
@@ -572,19 +571,6 @@ export default function Affiliate() {
     { id: 9, name: "Crown", discount: 900, buyerPays: 2099, selfPV: 64000, directMembers: 75, teamPV: 170000 },
     { id: 10, name: "Legend", discount: 1000, buyerPays: 1999, selfPV: 128000, directMembers: 100, teamPV: 300000 }
   ];
-
-  const handleDashboardAttempt = () => {
-    if (userData?.hasPurchasedProduct) {
-      window.location.href = '/dashboard';
-    } else {
-      toast({
-        title: 'Access Restricted',
-        description: 'At least one product is necessary to purchase after 999 payment to join this program.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   return (
     <div className="py-12 bg-gradient-to-b from-muted/20 to-muted/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -922,17 +908,13 @@ export default function Affiliate() {
                 ) : (
                   <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
                     <p className="text-primary font-semibold mb-2">
-                      {isAffiliate ? (userData?.hasPurchasedProduct ? "Full Access Granted!" : "Membership Paid! Purchase one product to activate dashboard.") : "Welcome back!"}
+                      {isAffiliate ? "You're already a member!" : "Welcome back!"}
                     </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-primary/30"
-                      onClick={handleDashboardAttempt}
-                      disabled={!isAffiliate || !userData?.hasPurchasedProduct}
-                    >
-                      {userData?.hasPurchasedProduct ? 'View Dashboard' : 'Purchase Product First'}
-                    </Button>
+                    <Link href="/dashboard">
+                      <Button variant="outline" size="sm" className="border-primary/30">
+                        View Dashboard
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>
