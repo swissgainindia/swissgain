@@ -24,7 +24,6 @@ import {
   Info,
   CreditCard,
   LogIn,
-  ShoppingCart,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth, findUserByCredentials } from './../lib/auth';
@@ -324,7 +323,7 @@ export default function Affiliate() {
       const userRef = ref(database, `affiliates/${userId}`);
       const generatedReferralCode = generateReferralCode(userDetails.name, userId);
     
-      const userDataToSave = {
+      const userData = {
         uid: userId,
         name: userDetails.name,
         email: userDetails.email,
@@ -335,15 +334,14 @@ export default function Affiliate() {
         joinDate: new Date().toISOString(),
         referralCode: generatedReferralCode,
         referralLink: `${window.location.origin}/affiliate?ref=${generatedReferralCode}`,
-        hasFirstPurchase: false, // ⭐ Set to false initially; enable after first product purchase
         // Keep it simple like the working version - no payment object
         ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
       };
      
-      await set(userRef, userDataToSave);
+      await set(userRef, userData);
      
       // Login the user immediately after registration
-      login(userDataToSave);
+      login(userData);
      
       // Track referral if refCode exists and referrerId is found
       if (refCode && referrerId) {
@@ -360,12 +358,12 @@ export default function Affiliate() {
     
       toast({
         title: 'Payment Successful! 🎉',
-        description: 'Welcome to SwissGain Affiliate Program! Now purchase your first product to unlock dashboard...',
+        description: 'Welcome to SwissGain Affiliate Program! Redirecting to dashboard...',
       });
      
-      // ⭐ Redirect to products instead of dashboard
+      // Redirect to dashboard after a delay
       setTimeout(() => {
-        window.location.href = '/products';
+        window.location.href = '/dashboard';
       }, 2000);
     } catch (error) {
       console.error('Registration error after payment:', error);
@@ -524,24 +522,12 @@ export default function Affiliate() {
       
         toast({
           title: 'Success!',
-          description: 'Logged in successfully.',
+          description: 'Logged in successfully. Redirecting to dashboard...',
         });
-
-        // ⭐ Redirect based on first purchase
-        const hasFirstPurchase = user.hasFirstPurchase ?? false;
-        if (hasFirstPurchase) {
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 1500);
-        } else {
-          setTimeout(() => {
-            window.location.href = '/products';
-          }, 1500);
-          toast({
-            title: 'Next Step',
-            description: 'Complete your first product purchase to unlock dashboard access.',
-          });
-        }
+      
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1500);
       } else {
         toast({
           title: 'Invalid Credentials',
@@ -585,10 +571,6 @@ export default function Affiliate() {
     { id: 9, name: "Crown", discount: 900, buyerPays: 2099, selfPV: 64000, directMembers: 75, teamPV: 170000 },
     { id: 10, name: "Legend", discount: 1000, buyerPays: 1999, selfPV: 128000, directMembers: 100, teamPV: 300000 }
   ];
-
-  const hasFirstPurchase = userData?.hasFirstPurchase ?? false;
-  const canAccessDashboard = isLoggedIn && isAffiliate && hasFirstPurchase;
-
   return (
     <div className="py-12 bg-gradient-to-b from-muted/20 to-muted/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -924,51 +906,15 @@ export default function Affiliate() {
                     </Button>
                   </>
                 ) : (
-                  <div className="space-y-3">
-                    {isAffiliate ? (
-                      <>
-                        {canAccessDashboard ? (
-                          <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
-                            <p className="text-primary font-semibold mb-2">
-                              You're a full member! Access your dashboard.
-                            </p>
-                            <Link href="/dashboard">
-                              <Button variant="outline" size="sm" className="border-primary/30">
-                                View Dashboard
-                              </Button>
-                            </Link>
-                          </div>
-                        ) : (
-                          <div className="bg-yellow-50 rounded-lg p-4 text-center border border-yellow-200">
-                            <p className="text-yellow-800 font-semibold mb-2">
-                              Welcome, {userData?.name}! Complete your first product purchase to unlock dashboard.
-                            </p>
-                            <Link href="/products">
-                              <Button className="w-full" variant="default">
-                                <ShoppingCart className="mr-2 h-4 w-4" />
-                                Buy First Product
-                              </Button>
-                            </Link>
-                            <p className="text-xs text-yellow-700 mt-2">
-                              After purchase, dashboard will be enabled automatically.
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
-                        <p className="text-primary font-semibold mb-2">
-                          Welcome back!
-                        </p>
-                        <Button
-                          onClick={() => setShowPayment(true)}
-                          className="w-full"
-                          variant="outline"
-                        >
-                          Upgrade to Affiliate
-                        </Button>
-                      </div>
-                    )}
+                  <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
+                    <p className="text-primary font-semibold mb-2">
+                      {isAffiliate ? "You're already a member!" : "Welcome back!"}
+                    </p>
+                    <Link href="/dashboard">
+                      <Button variant="outline" size="sm" className="border-primary/30">
+                        View Dashboard
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>

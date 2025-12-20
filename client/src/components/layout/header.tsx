@@ -89,25 +89,14 @@ export default function NecklaceEcommerceHeader() {
   const handleDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
 
-    const hasFirstPurchase = userData?.hasFirstPurchase ?? false;
-    const canAccessDashboard = isLoggedIn && isAffiliate && hasFirstPurchase;
-
-    if (canAccessDashboard) {
+    if (isLoggedIn && isAffiliate) {
       setLocation('/dashboard');
-    } else if (isLoggedIn && isAffiliate) {
-      toast({
-        title: 'Access Denied',
-        description: 'To access dashboard, complete your first product purchase after joining the program.',
-        variant: 'destructive'
-      });
     } else if (isAffiliate) {
       setShowLoginModal(true);
     } else {
       setLocation('/affiliate');
     }
   };
-
-  const dashboardDisabled = !(isLoggedIn && isAffiliate && (userData?.hasFirstPurchase ?? false));
 
   /* ⭐ FIXED — Login input handler */
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,19 +137,8 @@ export default function NecklaceEcommerceHeader() {
       login(user);
       setShowLoginModal(false);
       setLoginCreds({ username: '', password: '' });
-      toast({ title: 'Success!', description: 'Logged in successfully.' });
-
-      // Redirect based on first purchase
-      const hasFirstPurchase = user.hasFirstPurchase ?? false;
-      if (hasFirstPurchase) {
-        setTimeout(() => setLocation('/dashboard'), 1500);
-      } else {
-        setTimeout(() => setLocation('/products'), 1500);
-        toast({
-          title: 'Next Step',
-          description: 'Complete your first product purchase to unlock dashboard access.',
-        });
-      }
+      toast({ title: 'Success!', description: 'Logged in successfully. Redirecting to dashboard...' });
+      setTimeout(() => setLocation('/dashboard'), 1500);
 
     } catch (error) {
       console.error('Login error:', error);
@@ -294,14 +272,7 @@ export default function NecklaceEcommerceHeader() {
                           <Badge variant="secondary" className="mt-1 text-xs">Affiliate</Badge>
                         )}
                       </div>
-                      <button
-                        onClick={handleDashboardClick}
-                        disabled={dashboardDisabled}
-                        className={`block w-full text-left px-4 py-2 text-sm text-amber-800 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent ${dashboardDisabled ? 'cursor-not-allowed' : ''}`}
-                        title={dashboardDisabled ? 'To access dashboard, buy your first product after joining the program' : ''}
-                      >
-                        Dashboard
-                      </button>
+                      <a href="#" onClick={handleDashboardClick} className="block px-4 py-2 text-sm text-amber-800 hover:bg-amber-50">Dashboard</a>
                       <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-amber-800 hover:bg-amber-50">Logout</button>
                     </>
                   ) : (
