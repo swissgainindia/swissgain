@@ -203,7 +203,7 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 999 // Changed from 999 to 1
+        purchaseAmount: 1 // Changed from 999 to 1 yahan
       };
     
       await set(newRef, referralData);
@@ -267,8 +267,8 @@ export default function Affiliate() {
     }
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 99900, // ₹999 in paise (changed from 99900)
-      currency: 'INR',
+      amount: 100, // ₹999 in paise (changed from 99900) yahan
+      currency: 'INR', 
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
       image: '/logo.png',
@@ -705,14 +705,14 @@ export default function Affiliate() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Affiliate Membership:</span>
-                      <span>₹999</span> {/* Changed from ₹999 to ₹1 */}
+                      <span>₹1</span> {/* Changed from ₹999 to ₹1 yahan */}
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>One-time lifetime fee</span>
                     </div>
                     <div className="flex justify-between font-semibold border-t pt-2">
                       <span>Total Amount:</span>
-                      <span>₹999</span> {/* Changed from ₹999 to ₹1 */}
+                      <span>₹1</span> {/* Changed from ₹999 to ₹1 * yahan/}
                     </div>
                   </div>
                 </div>
@@ -820,7 +820,7 @@ export default function Affiliate() {
                       <p className="text-sm font-medium text-white/90">Product Price</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#d97706]/50 shadow-sm">
-                      <div className="text-3xl font-bold text-white mb-1">₹999</div> {/* Changed from ₹999 to ₹1 */}
+                      <div className="text-3xl font-bold text-white mb-1">₹1</div> {/* Changed from ₹999 to ₹1  yahan */}
                       <p className="text-sm font-medium text-white/90">Membership Fee</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#b45309]/50 shadow-sm">
@@ -880,7 +880,7 @@ export default function Affiliate() {
               </div>
               <CardTitle className="text-2xl font-bold text-foreground mb-2">Affiliate Membership</CardTitle>
               <div className="text-4xl font-bold text-primary mb-2">
-                ₹999<span className="text-lg font-normal text-muted-foreground"></span> {/* Changed from ₹999 to ₹1 */}
+                ₹1<span className="text-lg font-normal text-muted-foreground"></span> {/* Changed from ₹999 to ₹1  yahan */} 
               </div>
               <CardDescription>One-time membership fee with no recurring charges</CardDescription>
             </CardHeader>
