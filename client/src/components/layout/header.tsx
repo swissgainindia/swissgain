@@ -89,27 +89,25 @@ export default function NecklaceEcommerceHeader() {
   const handleDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
 
-    if (!isLoggedIn) {
-      setShowLoginModal(true);
-      return;
-    }
+    const hasFirstPurchase = userData?.hasFirstPurchase ?? false;
+    const canAccessDashboard = isLoggedIn && isAffiliate && hasFirstPurchase;
 
-    if (!isAffiliate) {
-      setLocation('/affiliate');
-      return;
-    }
-
-    if (!userData?.hasPurchasedProduct) {
+    if (canAccessDashboard) {
+      setLocation('/dashboard');
+    } else if (isLoggedIn && isAffiliate) {
       toast({
-        title: 'Access Restricted',
-        description: 'At least one product is necessary to purchase after 999 payment to join this program.',
+        title: 'Access Denied',
+        description: 'To access dashboard, complete your first product purchase after joining the program.',
         variant: 'destructive'
       });
-      return;
+    } else if (isAffiliate) {
+      setShowLoginModal(true);
+    } else {
+      setLocation('/affiliate');
     }
-
-    setLocation('/dashboard');
   };
+
+  const dashboardDisabled = !(isLoggedIn && isAffiliate && (userData?.hasFirstPurchase ?? false));
 
   /* ⭐ FIXED — Login input handler */
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,8 +148,19 @@ export default function NecklaceEcommerceHeader() {
       login(user);
       setShowLoginModal(false);
       setLoginCreds({ username: '', password: '' });
-      toast({ title: 'Success!', description: 'Logged in successfully. Redirecting to dashboard...' });
-      setTimeout(() => setLocation('/dashboard'), 1500);
+      toast({ title: 'Success!', description: 'Logged in successfully.' });
+
+      // Redirect based on first purchase
+      const hasFirstPurchase = user.hasFirstPurchase ?? false;
+      if (hasFirstPurchase) {
+        setTimeout(() => setLocation('/dashboard'), 1500);
+      } else {
+        setTimeout(() => setLocation('/products'), 1500);
+        toast({
+          title: 'Next Step',
+          description: 'Complete your first product purchase to unlock dashboard access.',
+        });
+      }
 
     } catch (error) {
       console.error('Login error:', error);
@@ -287,8 +296,9 @@ export default function NecklaceEcommerceHeader() {
                       </div>
                       <button
                         onClick={handleDashboardClick}
-                        disabled={!isAffiliate || !userData?.hasPurchasedProduct}
-                        className={`block w-full text-left px-4 py-2 text-sm ${!isAffiliate || !userData?.hasPurchasedProduct ? 'text-gray-400 cursor-not-allowed' : 'text-amber-800 hover:bg-amber-50'}`}
+                        disabled={dashboardDisabled}
+                        className={`block w-full text-left px-4 py-2 text-sm text-amber-800 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent ${dashboardDisabled ? 'cursor-not-allowed' : ''}`}
+                        title={dashboardDisabled ? 'To access dashboard, buy your first product after joining the program' : ''}
                       >
                         Dashboard
                       </button>

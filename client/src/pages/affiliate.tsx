@@ -24,6 +24,7 @@ import {
   Info,
   CreditCard,
   LogIn,
+  ShoppingCart,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth, findUserByCredentials } from './../lib/auth';
@@ -203,7 +204,7 @@ export default function Affiliate() {
         status: 'pending',
         earnings: 0,
         product: 'Affiliate Membership',
-        purchaseAmount: 1 // Changed from 999 to 1 yahan
+        purchaseAmount: 999 // Changed from 999 to 1
       };
     
       await set(newRef, referralData);
@@ -267,8 +268,8 @@ export default function Affiliate() {
     }
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: 100, // ₹999 in paise (changed from 99900)
-      currency: 'INR', 
+      amount: 99900, // ₹999 in paise (changed from 99900)
+      currency: 'INR',
       name: 'SwissGain',
       description: 'Affiliate Membership Registration',
       image: '/logo.png',
@@ -334,8 +335,8 @@ export default function Affiliate() {
         joinDate: new Date().toISOString(),
         referralCode: generatedReferralCode,
         referralLink: `${window.location.origin}/affiliate?ref=${generatedReferralCode}`,
-        hasPaidMembership: true,
-        hasPurchasedProduct: false,
+        hasFirstPurchase: false, // ⭐ Set to false initially; enable after first product purchase
+        // Keep it simple like the working version - no payment object
         ...(refCode && referrerId && { referredBy: refCode, referredById: referrerId })
       };
      
@@ -359,12 +360,12 @@ export default function Affiliate() {
     
       toast({
         title: 'Payment Successful! 🎉',
-        description: 'Welcome to SwissGain Affiliate Program! Redirecting to dashboard...',
+        description: 'Welcome to SwissGain Affiliate Program! Now purchase your first product to unlock dashboard...',
       });
      
-      // Redirect to dashboard after a delay
+      // ⭐ Redirect to products instead of dashboard
       setTimeout(() => {
-        window.location.href = '/dashboard';
+        window.location.href = '/products';
       }, 2000);
     } catch (error) {
       console.error('Registration error after payment:', error);
@@ -523,12 +524,24 @@ export default function Affiliate() {
       
         toast({
           title: 'Success!',
-          description: 'Logged in successfully. Redirecting to dashboard...',
+          description: 'Logged in successfully.',
         });
-      
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1500);
+
+        // ⭐ Redirect based on first purchase
+        const hasFirstPurchase = user.hasFirstPurchase ?? false;
+        if (hasFirstPurchase) {
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 1500);
+        } else {
+          setTimeout(() => {
+            window.location.href = '/products';
+          }, 1500);
+          toast({
+            title: 'Next Step',
+            description: 'Complete your first product purchase to unlock dashboard access.',
+          });
+        }
       } else {
         toast({
           title: 'Invalid Credentials',
@@ -573,17 +586,8 @@ export default function Affiliate() {
     { id: 10, name: "Legend", discount: 1000, buyerPays: 1999, selfPV: 128000, directMembers: 100, teamPV: 300000 }
   ];
 
-  const handleDashboardAttempt = () => {
-    if (userData?.hasPurchasedProduct) {
-      window.location.href = '/dashboard';
-    } else {
-      toast({
-        title: 'Access Restricted',
-        description: 'At least one product is necessary to purchase after 999 payment to join this program.',
-        variant: 'destructive',
-      });
-    }
-  };
+  const hasFirstPurchase = userData?.hasFirstPurchase ?? false;
+  const canAccessDashboard = isLoggedIn && isAffiliate && hasFirstPurchase;
 
   return (
     <div className="py-12 bg-gradient-to-b from-muted/20 to-muted/60">
@@ -705,14 +709,14 @@ export default function Affiliate() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Affiliate Membership:</span>
-                      <span>₹1</span> {/* Changed from ₹999 to ₹1 */}
+                      <span>₹999</span> {/* Changed from ₹999 to ₹1 */}
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>One-time lifetime fee</span>
                     </div>
                     <div className="flex justify-between font-semibold border-t pt-2">
                       <span>Total Amount:</span>
-                      <span>₹1</span> {/* Changed from ₹999 to ₹1 */}
+                      <span>₹999</span> {/* Changed from ₹999 to ₹1 */}
                     </div>
                   </div>
                 </div>
@@ -726,7 +730,7 @@ export default function Affiliate() {
                     Cancel
                   </Button>
                   <Button onClick={handlePayment} disabled={loading || !razorpayLoaded}>
-                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹1'} {/* Changed from ₹999 to ₹1 */}
+                    {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹999'} {/* Changed from ₹999 to ₹1 */}
                   </Button>
                 </div>
               </CardContent>
@@ -820,7 +824,7 @@ export default function Affiliate() {
                       <p className="text-sm font-medium text-white/90">Product Price</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#d97706]/50 shadow-sm">
-                      <div className="text-3xl font-bold text-white mb-1">₹1</div> {/* Changed from ₹999 to ₹1 */}
+                      <div className="text-3xl font-bold text-white mb-1">₹999</div> {/* Changed from ₹999 to ₹1 */}
                       <p className="text-sm font-medium text-white/90">Membership Fee</p>
                     </div>
                     <div className="bg-[#300708] rounded-xl p-5 text-center border border-[#b45309]/50 shadow-sm">
@@ -880,7 +884,7 @@ export default function Affiliate() {
               </div>
               <CardTitle className="text-2xl font-bold text-foreground mb-2">Affiliate Membership</CardTitle>
               <div className="text-4xl font-bold text-primary mb-2">
-                ₹1<span className="text-lg font-normal text-muted-foreground"></span> {/* Changed from ₹999 to ₹1 */}
+                ₹999<span className="text-lg font-normal text-muted-foreground"></span> {/* Changed from ₹999 to ₹1 */}
               </div>
               <CardDescription>One-time membership fee with no recurring charges</CardDescription>
             </CardHeader>
@@ -920,19 +924,51 @@ export default function Affiliate() {
                     </Button>
                   </>
                 ) : (
-                  <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
-                    <p className="text-primary font-semibold mb-2">
-                      {isAffiliate ? (userData?.hasPurchasedProduct ? "Full Access Granted!" : "Membership Paid! Purchase one product to activate dashboard.") : "Welcome back!"}
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-primary/30"
-                      onClick={handleDashboardAttempt}
-                      disabled={!isAffiliate || !userData?.hasPurchasedProduct}
-                    >
-                      {userData?.hasPurchasedProduct ? 'View Dashboard' : 'Purchase Product First'}
-                    </Button>
+                  <div className="space-y-3">
+                    {isAffiliate ? (
+                      <>
+                        {canAccessDashboard ? (
+                          <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
+                            <p className="text-primary font-semibold mb-2">
+                              You're a full member! Access your dashboard.
+                            </p>
+                            <Link href="/dashboard">
+                              <Button variant="outline" size="sm" className="border-primary/30">
+                                View Dashboard
+                              </Button>
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="bg-yellow-50 rounded-lg p-4 text-center border border-yellow-200">
+                            <p className="text-yellow-800 font-semibold mb-2">
+                              Welcome, {userData?.name}! Complete your first product purchase to unlock dashboard.
+                            </p>
+                            <Link href="/products">
+                              <Button className="w-full" variant="default">
+                                <ShoppingCart className="mr-2 h-4 w-4" />
+                                Buy First Product
+                              </Button>
+                            </Link>
+                            <p className="text-xs text-yellow-700 mt-2">
+                              After purchase, dashboard will be enabled automatically.
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/20">
+                        <p className="text-primary font-semibold mb-2">
+                          Welcome back!
+                        </p>
+                        <Button
+                          onClick={() => setShowPayment(true)}
+                          className="w-full"
+                          variant="outline"
+                        >
+                          Upgrade to Affiliate
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
