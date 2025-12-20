@@ -11,7 +11,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '@/components/product-card';
-import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard } from 'lucide-react';
+import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, Heart, Share2, ArrowLeft, CreditCard, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
@@ -172,7 +172,6 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
 // Update Order Payment Status
 const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
   try {
-    console.log(`Updating order ${orderId} with payment ${paymentId}, status: ${status}`);
     const orderRef = ref(firebaseDatabase, `orders/${orderId}`);
     const updates = {
       paymentId,
@@ -182,9 +181,7 @@ const updateOrderPaymentStatus = async (orderId: string, paymentId: string, stat
       updatedAt: new Date().toISOString()
     };
    
-    console.log('Firebase update data:', updates);
     await update(orderRef, updates);
-    console.log('Firebase update successful');
   } catch (error) {
     console.error('Error updating payment status in Firebase:', error);
     console.error('Error details:', {
@@ -237,7 +234,6 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
       orderId,
       status: 'completed'
     });
-    console.log(`💰 Wallet updated for ${affiliateId}: +₹${amount} = ₹${newBalance}`);
   } catch (error) {
     console.error('Error adding to wallet:', error);
     throw error;
@@ -322,10 +318,8 @@ const giveCombinedReferralBonus = async (directReferrerId: string, customerName:
     });
     await addCommissionToWallet(directReferrerId, totalEarnings, transactionDescription, orderId);
     await updateReferralStats(directReferrerId, totalEarnings);
-   
-    console.log(`✅ Combined bonus given: ₹${totalEarnings} (₹${commissionAmount} + ₹${fixedBonusAmount}) to ${directReferrerId}`);
   } catch (error) {
-    console.error('❌ Failed to give combined referral bonus:', error);
+    console.error('Failed to give combined referral bonus:', error);
     throw error;
   }
 };
@@ -380,7 +374,6 @@ const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: s
       });
       await addCommissionToWallet(upline.id, commissionAmount, description, orderId);
       await updateReferralStats(upline.id, commissionAmount);
-      console.log(`💰 Level ${level} commission: ₹${commissionAmount} (${rate * 100}% ${level === 1 ? '+ ₹100 bonus' : ''}) to ${upline.id}`);
     }
     if (chain.length > 0) {
       const directComm = Math.round(totalAmount * 0.10) + 100;
@@ -410,16 +403,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
   const totalAmount = product.price * quantity;
-  useEffect(() => {
-    console.log('CheckoutModal state:', {
-      isOpen,
-      loading,
-      paymentLoading,
-      razorpayLoaded,
-      formData,
-      totalAmount
-    });
-  }, [isOpen, loading, paymentLoading, razorpayLoaded, formData, totalAmount]);
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
@@ -535,43 +518,23 @@ handler: async function (response: any) {
   };
   // Process commissions after payment
   const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
-    console.log('Starting commission processing for order:', orderId);
-    console.log('Order data:', orderData);
-    console.log('Form data:', formData);
-   
     try {
       // Combined 10% + ₹100 Bonus for Direct Referral Link
       if (affiliateId && uid !== affiliateId) {
-        console.log('Checking affiliate:', affiliateId);
         const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
-        console.log('Affiliate exists:', referrerSnap.exists());
        
         if (referrerSnap.exists()) {
-          console.log(`🎯 Giving combined bonus to affiliate: ${affiliateId}`);
           await giveCombinedReferralBonus(affiliateId, formData.name, product.name, orderId, totalAmount);
-        } else {
-          console.log(`❌ Affiliate ${affiliateId} not found in database`);
         }
-      } else {
-        console.log(`ℹ️ No affiliate bonus: affiliateId=${affiliateId}, uid=${uid}`);
       }
       // Multi-level commissions (only if buyer is affiliate)
       if (uid) {
-        console.log('Checking if buyer is affiliate:', uid);
         const affSnap = await get(ref(firebaseDatabase, `affiliates/${uid}`));
-        console.log('Buyer affiliate check:', {
-          exists: affSnap.exists(),
-          isAffiliate: affSnap.exists() ? affSnap.val().isAffiliate : false
-        });
        
         if (affSnap.exists() && affSnap.val().isAffiliate) {
-          console.log(`🔗 Processing multi-level commissions for buyer: ${uid}`);
           await processMultiLevelCommissions(uid, orderId, totalAmount, formData, product);
-        } else {
-          console.log(`ℹ️ Buyer ${uid} is not an affiliate, no multi-level commissions`);
         }
       }
-      console.log(`✅ All commissions processed for order: ${orderId}`);
     } catch (error) {
       console.error('Commission processing error details:', {
         error: error.message,
@@ -634,7 +597,7 @@ handler: async function (response: any) {
           <div className="bg-muted p-4 rounded-lg">
             <h3 className="font-semibold mb-3">Order Summary</h3>
             <div className="flex items-center space-x-3 mb-3">
-              <img src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" />
+              <img src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" loading="lazy" />
               <div className="flex-1">
                 <p className="font-medium">{product.name}</p>
                 <p className="text-sm text-muted-foreground">Quantity: {quantity}</p>
@@ -746,8 +709,81 @@ handler: async function (response: any) {
     </Dialog>
   );
 }
+// Image Zoom Modal
+interface ImageZoomModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  images: string[];
+  currentIndex: number;
+}
+function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }: ImageZoomModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  useEffect(() => {
+    setCurrentIndex(initialIndex);
+  }, [initialIndex, isOpen]);
+
+  const currentImage = images[currentIndex] || FALLBACK_IMAGE;
+
+  const prev = () => setCurrentIndex((i) => (i - 1 + images.length) % images.length);
+  const next = () => setCurrentIndex((i) => (i + 1) % images.length);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-4">
+        <div className="relative flex items-center justify-center h-[70vh]">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
+            onClick={prev}
+          >
+            <ChevronLeft className="h-8 w-8" />
+          </Button>
+          <img
+            src={currentImage}
+            alt={`Zoomed image ${currentIndex + 1}`}
+            className="max-w-full max-h-full object-contain rounded-lg"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_IMAGE;
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
+            onClick={next}
+          >
+            <ChevronRight className="h-8 w-8" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-4 right-4 bg-background/80 hover:bg-background"
+            onClick={onClose}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          {images.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentIndex(i)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    i === currentIndex ? 'bg-primary' : 'bg-muted-foreground/50'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
-const BASE_IMAGE_URL = 'https://swissgainindia.com';
 export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
   const productId = params?.id;
@@ -763,6 +799,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { updateData } = useLocalStorage();
@@ -774,18 +811,30 @@ export default function ProductDetail() {
       try {
         const res = await axios.get(`/api/products/${productId}`);
         if (res.data) {
-          const mainImage = res.data.image ? (res.data.image.startsWith('http') ? res.data.image : `${BASE_IMAGE_URL}${res.data.image}`) : null;
-          const additionalImages = res.data.images ? (Array.isArray(res.data.images) ? res.data.images : res.data.images.split(',').map((s: string) => s.trim())) : [];
-          const allImages = [mainImage, ...additionalImages.filter(Boolean).map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)].filter(Boolean);
+          // ✅ Fix: Use URLs directly—no prepending!
+          // Assume upload returns relative paths like '/uploads/filename.jpg' or full URLs.
+          // Next.js serves relative paths from /public automatically.
+          const mainImage = res.data.image || null;
+          const additionalImages = res.data.images ? 
+            (Array.isArray(res.data.images) ? res.data.images : res.data.images.split(',').map((s: string) => s.trim()).filter(Boolean)) : 
+            [];
+          const allImages = [mainImage, ...additionalImages].filter(Boolean);
+
           setProduct({
             ...res.data,
             images: allImages.length > 0 ? allImages : [FALLBACK_IMAGE],
             affiliateId
           });
+
+          // Same fix for related products
           const relatedRes = await axios.get(`/api/products?category=${res.data.category}`);
           setRelatedProducts(relatedRes.data.filter((p: any) => p._id !== res.data._id).slice(0, 4).map((p: any) => {
-            const pImages = [p.image ? (p.image.startsWith('http') ? p.image : `${BASE_IMAGE_URL}${p.image}`) : null, ...(p.images || []).map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)].filter(Boolean);
-            return { ...p, images: pImages.length > 0 ? pImages : [FALLBACK_IMAGE] };
+            const pMainImage = p.image || null;
+            const pAdditionalImages = p.images ? 
+              (Array.isArray(p.images) ? p.images : p.images.split(',').map((s: string) => s.trim()).filter(Boolean)) : 
+              [];
+            const pAllImages = [pMainImage, ...pAdditionalImages].filter(Boolean);
+            return { ...p, images: pAllImages.length > 0 ? pAllImages : [FALLBACK_IMAGE] };
           }));
         } else setError(true);
       } catch (err) {
@@ -818,6 +867,10 @@ export default function ProductDetail() {
     handleAddToCart();
     setIsCheckoutOpen(true);
   };
+  const handleImageClick = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsZoomOpen(true);
+  };
   if (loading) return <div className="py-20 text-center text-xl">Loading product...</div>;
   if (error || !product) return (
     <div className="py-20 bg-white min-h-screen flex items-center justify-center text-center">
@@ -842,34 +895,43 @@ export default function ProductDetail() {
         </nav>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
           <div className="space-y-4">
-            <div className="relative">
+            <div className="relative overflow-hidden rounded-xl shadow-lg">
               <img
                 src={product.images[selectedImageIndex] || FALLBACK_IMAGE}
                 alt={product.name}
-                className="rounded-xl shadow-lg w-full h-96 object-cover"
-                onError={(e) => e.currentTarget.src = FALLBACK_IMAGE}
+                className="w-full h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"
+                onClick={() => handleImageClick(selectedImageIndex)}
+                loading="eager"
+                onError={(e) => {
+                  console.warn(`Failed to load image: ${e.currentTarget.src}`); // Debug log
+                  e.currentTarget.src = FALLBACK_IMAGE;
+                }}
               />
               {product.discount && (
-                <Badge variant="destructive" className="absolute top-4 left-4 text-lg px-3 py-1">
+                <Badge variant="destructive" className="absolute top-4 left-4 text-lg px-3 py-1 z-10">
                   {product.discount}% OFF
                 </Badge>
               )}
               {!isInStock && (
-                <Badge variant="secondary" className="absolute top-4 right-4 text-lg px-3 py-1">
+                <Badge variant="secondary" className="absolute top-4 right-4 text-lg px-3 py-1 z-10">
                   Out of Stock
                 </Badge>
               )}
             </div>
             {product.images.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {product.images.map((img: string, i: number) => (
                   <img
                     key={i}
-                    src={img}
-                    alt=""
-                    className={`rounded-lg cursor-pointer h-20 object-cover ${selectedImageIndex === i ? 'ring-2 ring-primary' : ''}`}
+                    src={img || FALLBACK_IMAGE}
+                    alt={`Thumbnail ${i + 1}`}
+                    className={`rounded-lg cursor-pointer h-20 w-20 flex-shrink-0 object-cover transition-transform duration-200 hover:scale-105 ${selectedImageIndex === i ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                     onClick={() => setSelectedImageIndex(i)}
-                    onError={(e) => e.currentTarget.src = FALLBACK_IMAGE}
+                    loading="lazy"
+                    onError={(e) => {
+                      console.warn(`Failed to load thumbnail: ${e.currentTarget.src}`);
+                      e.currentTarget.src = FALLBACK_IMAGE;
+                    }}
                   />
                 ))}
               </div>
@@ -1051,6 +1113,12 @@ export default function ProductDetail() {
         affiliateId={affiliateId}
         customerId={customerId}
         uid={uid}
+      />
+      <ImageZoomModal
+        isOpen={isZoomOpen}
+        onClose={() => setIsZoomOpen(false)}
+        images={product.images}
+        currentIndex={selectedImageIndex}
       />
     </div>
   );

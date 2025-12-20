@@ -1,5 +1,7 @@
 import React from "react";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, ArrowLeft, ShoppingBag } from "lucide-react";
+import { Link } from 'wouter';
+import { Button } from '@/components/ui/button';
 
 const ThankYou: React.FC = () => {
   return (
@@ -25,8 +27,24 @@ const ThankYou: React.FC = () => {
         {/* Divider */}
         <div className="border-t border-gray-200 my-6"></div>
 
+        {/* Buttons */}
+        <div className="space-y-3 mb-6">
+          <Button asChild className="w-full">
+            <Link href="/">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/order">
+              <ShoppingBag className="mr-2 h-4 w-4" />
+              View Orders
+            </Link>
+          </Button>
+        </div>
+
         {/* Extra Info */}
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-gray-500">
           If you have any questions, feel free to contact our support team.
         </p>
 

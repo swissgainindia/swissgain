@@ -89,13 +89,26 @@ export default function NecklaceEcommerceHeader() {
   const handleDashboardClick = (e: React.MouseEvent) => {
     e.preventDefault();
 
-    if (isLoggedIn && isAffiliate) {
-      setLocation('/dashboard');
-    } else if (isAffiliate) {
+    if (!isLoggedIn) {
       setShowLoginModal(true);
-    } else {
-      setLocation('/affiliate');
+      return;
     }
+
+    if (!isAffiliate) {
+      setLocation('/affiliate');
+      return;
+    }
+
+    if (!userData?.hasPurchasedProduct) {
+      toast({
+        title: 'Access Restricted',
+        description: 'At least one product is necessary to purchase after 999 payment to join this program.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setLocation('/dashboard');
   };
 
   /* ⭐ FIXED — Login input handler */
@@ -272,7 +285,13 @@ export default function NecklaceEcommerceHeader() {
                           <Badge variant="secondary" className="mt-1 text-xs">Affiliate</Badge>
                         )}
                       </div>
-                      <a href="#" onClick={handleDashboardClick} className="block px-4 py-2 text-sm text-amber-800 hover:bg-amber-50">Dashboard</a>
+                      <button
+                        onClick={handleDashboardClick}
+                        disabled={!isAffiliate || !userData?.hasPurchasedProduct}
+                        className={`block w-full text-left px-4 py-2 text-sm ${!isAffiliate || !userData?.hasPurchasedProduct ? 'text-gray-400 cursor-not-allowed' : 'text-amber-800 hover:bg-amber-50'}`}
+                      >
+                        Dashboard
+                      </button>
                       <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-amber-800 hover:bg-amber-50">Logout</button>
                     </>
                   ) : (

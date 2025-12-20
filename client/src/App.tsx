@@ -23,6 +23,7 @@ import RefundAndCancellation from "./pages/RefundAndCancellation";
 import AffiliateSales from "./pages/AffilliateSales";
 import TestReferralEarnings from "./pages/admin/TestReferralEarnings";
 import ThankYouPage from "./pages/thankyou";
+import Order from "./pages/Order";
 
 function Router() {
   return (
@@ -39,6 +40,7 @@ function Router() {
       
       <Route path="/affiliate" component={Affiliate} />
        <Route path="/thank-you" component={ThankYouPage} />
+       <Route path="/order" component={Order} />
       <Route path="/refer-earn" component={ReferEarn} />
       <Route path="/cart" component={Cart} />
       <Route path="/dashboard" component={Dashboard} />

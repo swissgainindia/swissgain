@@ -7,16 +7,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import axios from "axios";
+
 interface ProductFormProps {
   product?: any;
   onClose: () => void;
 }
+
 export default function ProductForm({ product, onClose }: ProductFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [additionalImageFiles, setAdditionalImageFiles] = useState<File[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: product?.name || "",
@@ -32,6 +35,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
     inStock: product?.inStock !== undefined ? product.inStock : true,
     stockQuantity: product?.stockQuantity || "",
   });
+
   // ✅ Fetch categories from MongoDB
   useEffect(() => {
     const fetchCategories = async () => {
@@ -44,6 +48,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
     };
     fetchCategories();
   }, []);
+
   // Handle inStock switch change
   const handleInStockChange = (checked: boolean) => {
     setFormData(prev => {
@@ -55,17 +60,32 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
       return newData;
     });
   };
+
   // ✅ Handle field changes
   const handleChange = (field: string, value: any) => {
     setFormData({ ...formData, [field]: value });
   };
+
+  // Remove existing image
+  const removeExistingImage = (urlToRemove: string) => {
+    const existing = formData.images ? formData.images.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+    const updated = existing.filter((url: string) => url !== urlToRemove);
+    setFormData(prev => ({ ...prev, images: updated.join(", ") }));
+  };
+
+  // Remove new additional image file
+  const removeNewImage = (indexToRemove: number) => {
+    const updated = additionalImageFiles.filter((_, idx) => idx !== indexToRemove);
+    setAdditionalImageFiles(updated);
+  };
+
   // ✅ Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       let imageUrl = formData.image;
-      // Upload image if new one selected
+      // Upload main image if new one selected
       if (imageFile) {
         const uploadData = new FormData();
         uploadData.append("image", imageFile);
@@ -77,16 +97,35 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         const data = await res.json();
         imageUrl = data.imageUrl;
       }
+
+      // Handle additional images: upload new files and append to existing
+      const existingImages = formData.images ? formData.images.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+      let additionalImageUrls: string[] = [...existingImages];
+      if (additionalImageFiles.length > 0) {
+        for (const file of additionalImageFiles) {
+          const uploadData = new FormData();
+          uploadData.append("image", file);
+          const res = await fetch("/api/admin/upload", {
+            method: "POST",
+            body: uploadData,
+          });
+          if (!res.ok) throw new Error("Image upload failed");
+          const data = await res.json();
+          additionalImageUrls.push(data.imageUrl);
+        }
+      }
+
       const productData = {
         ...formData,
         image: imageUrl,
+        images: additionalImageUrls,
         price: parseFloat(formData.price as string),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice as string) : undefined,
         discount: formData.discount ? parseFloat(formData.discount as string) : undefined,
         stockQuantity: !formData.inStock ? 0 : (formData.stockQuantity ? parseInt(formData.stockQuantity as string) : 0),
-        images: formData.images ? formData.images.split(",").map((s: string) => s.trim()) : [],
         features: formData.features ? formData.features.split(",").map((s: string) => s.trim()) : [],
       };
+
       if (product?._id) {
         await updateProduct(product._id, productData);
         toast({ title: "Success", description: "Product updated successfully" });
@@ -104,8 +143,12 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
       });
     } finally {
       setLoading(false);
+      // Clear file states after submit
+      setImageFile(null);
+      setAdditionalImageFiles([]);
     }
   };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -243,12 +286,69 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="images">Additional Images (comma-separated URLs)</Label>
-          <Input
-            id="images"
-            value={formData.images}
-            onChange={(e) => handleChange("images", e.target.value)}
-          />
+          <Label>Additional Images</Label>
+          <div className="space-y-2">
+            {/* Preview existing images */}
+            {formData.images && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.images.split(",").filter(Boolean).map((url: string, idx: number) => {
+                  const trimmedUrl = url.trim();
+                  return (
+                    <div key={idx} className="relative group">
+                      <img
+                        src={trimmedUrl}
+                        alt={`Existing preview ${idx + 1}`}
+                        className="w-16 h-16 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-1 -right-1 bg-background rounded-full p-0 w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeExistingImage(trimmedUrl)}
+                      >
+                        <X className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* File input for new additional images */}
+            <Input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                setAdditionalImageFiles(files);
+              }}
+            />
+            {/* Preview new selected files */}
+            {additionalImageFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {additionalImageFiles.map((file, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={`New preview ${idx + 1}`}
+                      className="w-16 h-16 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute -top-1 -right-1 bg-background rounded-full p-0 w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeNewImage(idx)}
+                    >
+                      <X className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-sm text-gray-500">Select files to add new images (existing images will be preserved)</p>
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="features">Features (comma-separated)</Label>

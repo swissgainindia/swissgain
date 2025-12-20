@@ -40,6 +40,7 @@ import { ReportsContent } from './components/ReportsContent';
 import { SidebarItem } from './components/SidebarItem'
 import PaymentRequest from './components/BankDetailsPage';
 import UserSupportCenter from './components/UserSupportCenter';
+import Orders from './Order';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -630,7 +631,9 @@ export default function Dashboard() {
       case 'reports':
         return <ReportsContent reports={firebaseData.reports} />;
       case 'support-center':
-        return <UserSupportCenter  />;  
+        return <UserSupportCenter  />; 
+      case 'orders':
+        return  <Orders />;
       default:
         return <OverviewContent
           data={{ membership: { isAffiliate: dashboardUserData.isAffiliate, rank: userData?.rank || 1 } }}
@@ -816,6 +819,14 @@ export default function Dashboard() {
               onClick={() => setActiveTab('support-center')}
               collapsed={sidebarCollapsed}
             />
+
+            <SidebarItem
+              icon={<BarChart3 className="h-4 w-4" />}
+              label="Orders"
+              active={activeTab === 'orders'}
+              onClick={() => setActiveTab('orders')}
+              collapsed={sidebarCollapsed}
+            />
           </nav>
         </div>
 
@@ -846,14 +857,14 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
+              {/* <Button variant="outline" size="sm">
                 <Bell className="h-4 w-4 mr-2" />
                 Notifications
-              </Button>
-              <Button variant="outline" size="sm">
+              </Button> */}
+              {/* <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
-              </Button>
+              </Button> */}
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
