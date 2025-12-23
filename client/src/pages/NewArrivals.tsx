@@ -49,7 +49,6 @@ const NewArrivals: React.FC = () => {
             className="object-cover w-full h-full absolute inset-0"
             loading="lazy"
           />
-          <p className="absolute bottom-5 left-5 text-white text-xl font-serif">Mangalsutra</p>
         </div>
 
         {/* Card 2 - Pendants */}
@@ -60,7 +59,6 @@ const NewArrivals: React.FC = () => {
             className="object-cover w-full h-full absolute inset-0"
             loading="lazy"
           />
-          <p className="absolute bottom-5 left-5 text-white text-xl font-serif">Pendants</p>
         </div>
       </div>
     </section>

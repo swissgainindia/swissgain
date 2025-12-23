@@ -15,6 +15,7 @@ import { Star, Check, ShoppingCart, Zap, Truck, RotateCcw, Shield, Plus, Minus, 
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
+
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -26,6 +27,7 @@ const firebaseConfig = {
   appId: "1:1062016445247:web:bf559ce1ed7f17e2ca418a",
   measurementId: "G-VTKPWVEY0S"
 };
+
 // Initialize Firebase only once
 let database: any = null;
 const initializeFirebase = () => {
@@ -45,12 +47,15 @@ const initializeFirebase = () => {
     throw error;
   }
 };
+
 const firebaseDatabase = initializeFirebase();
+
 // Razorpay Configuration
 const RAZORPAY_CONFIG = {
   key_id: "rzp_live_RjxoVsUGVyJUhQ",
   key_secret: "shF22XqtflD64nRd2GdzCYoT",
 };
+
 // Load Razorpay script
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -71,8 +76,10 @@ const loadRazorpayScript = () => {
     document.body.appendChild(script);
   });
 };
+
 // Commission rates (total ~24.4%)
 const commissionRates = [0.10, 0.05, 0.025, 0.02, 0.015, 0.01, 0.008, 0.006, 0.005, 0.005];
+
 interface OrderData {
   productId: string;
   affiliateId?: string;
@@ -108,6 +115,7 @@ interface OrderData {
   razorpayOrderId?: string;
   razorpaySignature?: string;
 }
+
 // Customer ID Helpers
 const generateUniqueCustomerId = () => {
   if (typeof window === 'undefined') return "default_customer";
@@ -121,12 +129,15 @@ const generateUniqueCustomerId = () => {
   }
   return customerId;
 };
+
 const getOrCreateCustomerId = () => generateUniqueCustomerId();
+
 const getCookie = (name: string) => {
   if (typeof document === 'undefined') return null;
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? m[2] : null;
 };
+
 // Upline Chain
 const getUplineChain = async (affiliateId: string, maxLevels = 10): Promise<any[]> => {
   const chain = [];
@@ -146,6 +157,7 @@ const getUplineChain = async (affiliateId: string, maxLevels = 10): Promise<any[
   }
   return chain;
 };
+
 // Save Order
 const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
   try {
@@ -169,6 +181,7 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
     throw error;
   }
 };
+
 // Update Order Payment Status
 const updateOrderPaymentStatus = async (orderId: string, paymentId: string, status: 'paid' | 'failed'): Promise<void> => {
   try {
@@ -194,6 +207,7 @@ const updateOrderPaymentStatus = async (orderId: string, paymentId: string, stat
     throw error;
   }
 };
+
 // Save Commission Record
 const saveCommissionRecord = async (commissionData: any): Promise<void> => {
   try {
@@ -211,6 +225,7 @@ const saveCommissionRecord = async (commissionData: any): Promise<void> => {
     throw error;
   }
 };
+
 // Add to Wallet
 const addCommissionToWallet = async (affiliateId: string, amount: number, description: string, orderId: string): Promise<void> => {
   try {
@@ -239,6 +254,7 @@ const addCommissionToWallet = async (affiliateId: string, amount: number, descri
     throw error;
   }
 };
+
 // Update Referral After Purchase
 const updateReferralAfterPurchase = async (affiliateId: string, customerId: string, customerName: string, customerEmail: string, earnings: number, productName: string, orderId: string): Promise<void> => {
   try {
@@ -264,6 +280,7 @@ const updateReferralAfterPurchase = async (affiliateId: string, customerId: stri
     throw error;
   }
 };
+
 // Update Referral Stats
 const updateReferralStats = async (affiliateId: string, amount: number): Promise<void> => {
   try {
@@ -279,6 +296,7 @@ const updateReferralStats = async (affiliateId: string, amount: number): Promise
     console.error('Error updating stats:', error);
   }
 };
+
 // Combined 10% + ₹100 Fixed Bonus for Direct Referral Link Purchase
 const giveCombinedReferralBonus = async (directReferrerId: string, customerName: string, productName: string, orderId: string, totalAmount: number): Promise<void> => {
   try {
@@ -323,6 +341,7 @@ const giveCombinedReferralBonus = async (directReferrerId: string, customerName:
     throw error;
   }
 };
+
 // Process multi-level commissions
 const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: string, totalAmount: number, formData: any, product: any) => {
   try {
@@ -384,6 +403,26 @@ const processMultiLevelCommissions = async (buyerAffiliateId: string, orderId: s
     throw error;
   }
 };
+
+// NEW FUNCTION: Mark user as purchased
+const markUserAsPurchased = async (userId: string) => {
+  try {
+    const affiliateRef = ref(firebaseDatabase, `affiliates/${userId}`);
+    const snap = await get(affiliateRef);
+    
+    if (snap.exists()) {
+      await update(affiliateRef, {
+        hasPurchasedProduct: true,
+        lastPurchaseDate: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      });
+      console.log(`User ${userId} marked as purchased product`);
+    }
+  } catch (error) {
+    console.error('Error marking user as purchased:', error);
+  }
+};
+
 // Checkout Modal with Razorpay Integration
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -394,6 +433,7 @@ interface CheckoutModalProps {
   customerId: string;
   uid?: string;
 }
+
 function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -403,6 +443,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
   const totalAmount = product.price * quantity;
+  
   useEffect(() => {
     if (isOpen) {
       setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
@@ -420,102 +461,14 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
     }
   }, [isOpen]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
   const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
-  // Initiate Razorpay Payment
-  const initiateRazorpayPayment = async (orderData: OrderData) => {
-    if (!razorpayLoaded) {
-      toast({
-        title: 'Payment Error',
-        description: 'Payment system is loading. Please try again in a moment.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-    if (!window.Razorpay) {
-      toast({
-        title: 'Payment Error',
-        description: 'Razorpay not available. Please refresh the page.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-    const options = {
-      key: RAZORPAY_CONFIG.key_id,
-      amount: totalAmount * 100, // Convert to paise
-      currency: 'INR',
-      name: 'SwissGain',
-      description: `Purchase: ${product.name}`,
-      image: '/logo.png',
-handler: async function (response: any) {
-  try {
-    const paidOrderData: OrderData = {
-      ...orderData,
-      status: 'pending',
-      paymentStatus: 'paid',
-      paymentId: response.razorpay_payment_id,
-      razorpayOrderId: response.razorpay_order_id || '',
-      razorpaySignature: response.razorpay_signature || '',
-      createdAt: new Date().toISOString(),
-    };
-    const orderId = await saveOrderToFirebase(paidOrderData);
-    await processCommissionsAfterPayment(orderId, paidOrderData);
-    toast({
-      title: "Payment Successful 🎉",
-      description: `Order ID: ${orderId}`,
-    });
-    onClose();
-    window.location.href = `/thank-you`;
-  } catch (err) {
-    toast({
-      title: "Payment done but order failed",
-      description: "Contact support with payment ID",
-      variant: "destructive",
-    });
-  }
-}
-,
-      prefill: {
-        name: formData.name,
-        email: formData.email,
-        contact: formData.phone,
-      },
-    notes: {
-  address: formData.address,
-  product_id: product._id,
-  customer_id: customerId,
-  affiliate_id: affiliateId || 'none'
-},
-      theme: {
-        color: '#b45309',
-      },
-      modal: {
-        ondismiss: function() {
-          toast({
-            title: 'Payment Cancelled',
-            description: 'You cancelled the payment process.',
-            variant: 'default',
-          });
-        }
-      }
-    };
-    try {
-      const razorpayInstance = new window.Razorpay(options);
-      razorpayInstance.open();
-      return true;
-    } catch (error) {
-      console.error('Razorpay initialization error:', error);
-      toast({
-        title: 'Payment Error',
-        description: 'Failed to initialize payment. Please try again.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-  };
+
   // Process commissions after payment
   const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
     try {
@@ -546,44 +499,143 @@ handler: async function (response: any) {
       throw error;
     }
   };
-  const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!formData.name || !formData.email || !formData.phone || !formData.address) {
-    toast({ title: "Incomplete Form", variant: "destructive" });
-    return;
-  }
-  setLoading(true);
-  try {
-    const purchaseCustomerId = generatePurchaseCustomerId();
-    const orderData: OrderData = {
-      productId: product._id,
-      ...(affiliateId && { affiliateId }),
-      customerId: purchaseCustomerId,
-      originalCustomerId: customerId,
-      productName: product.name,
-      price: product.price,
-      quantity,
-      totalAmount,
-      customerInfo: formData,
-      images: product.images,
-      category: product.category,
-      paymentMethod: 'razorpay',
-      paymentStatus: 'pending', // will change after payment
-      status: 'pending',
-      createdAt: new Date().toISOString(),
+
+  // Initiate Razorpay Payment
+  const initiateRazorpayPayment = async (orderData: OrderData) => {
+    if (!razorpayLoaded) {
+      toast({
+        title: 'Payment Error',
+        description: 'Payment system is loading. Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    if (!window.Razorpay) {
+      toast({
+        title: 'Payment Error',
+        description: 'Razorpay not available. Please refresh the page.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    const options = {
+      key: RAZORPAY_CONFIG.key_id,
+      amount: totalAmount * 100, // Convert to paise
+      currency: 'INR',
+      name: 'SwissGain',
+      description: `Purchase: ${product.name}`,
+      image: '/logo.png',
+      handler: async function (response: any) {
+        try {
+          const paidOrderData: OrderData = {
+            ...orderData,
+            status: 'pending',
+            paymentStatus: 'paid',
+            paymentId: response.razorpay_payment_id,
+            razorpayOrderId: response.razorpay_order_id || '',
+            razorpaySignature: response.razorpay_signature || '',
+            createdAt: new Date().toISOString(),
+          };
+          const orderId = await saveOrderToFirebase(paidOrderData);
+          
+          // MARK USER AS PURCHASED - ONLY THIS ADDITION
+          if (uid) {
+            await markUserAsPurchased(uid);
+          }
+          
+          await processCommissionsAfterPayment(orderId, paidOrderData);
+          toast({
+            title: "Payment Successful 🎉",
+            description: `Order ID: ${orderId}`,
+          });
+          onClose();
+          window.location.href = `/thank-you`;
+        } catch (err) {
+          toast({
+            title: "Payment done but order failed",
+            description: "Contact support with payment ID",
+            variant: "destructive",
+          });
+        }
+      },
+      prefill: {
+        name: formData.name,
+        email: formData.email,
+        contact: formData.phone,
+      },
+      notes: {
+        address: formData.address,
+        product_id: product._id,
+        customer_id: customerId,
+        affiliate_id: affiliateId || 'none'
+      },
+      theme: {
+        color: '#b45309',
+      },
+      modal: {
+        ondismiss: function() {
+          toast({
+            title: 'Payment Cancelled',
+            description: 'You cancelled the payment process.',
+            variant: 'default',
+          });
+        }
+      }
     };
-    // 🔥 Directly open Razorpay
-    await initiateRazorpayPayment(orderData);
-  } catch (err: any) {
-    toast({
-      title: "Checkout Failed",
-      description: err.message,
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.open();
+      return true;
+    } catch (error) {
+      console.error('Razorpay initialization error:', error);
+      toast({
+        title: 'Payment Error',
+        description: 'Failed to initialize payment. Please try again.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email || !formData.phone || !formData.address) {
+      toast({ title: "Incomplete Form", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const purchaseCustomerId = generatePurchaseCustomerId();
+      const orderData: OrderData = {
+        productId: product._id,
+        ...(affiliateId && { affiliateId }),
+        customerId: purchaseCustomerId,
+        originalCustomerId: customerId,
+        productName: product.name,
+        price: product.price,
+        quantity,
+        totalAmount,
+        customerInfo: formData,
+        images: product.images,
+        category: product.category,
+        paymentMethod: 'razorpay',
+        paymentStatus: 'pending', // will change after payment
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      // 🔥 Directly open Razorpay
+      await initiateRazorpayPayment(orderData);
+    } catch (err: any) {
+      toast({
+        title: "Checkout Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
@@ -709,6 +761,7 @@ handler: async function (response: any) {
     </Dialog>
   );
 }
+
 // Image Zoom Modal
 interface ImageZoomModalProps {
   isOpen: boolean;
@@ -716,6 +769,7 @@ interface ImageZoomModalProps {
   images: string[];
   currentIndex: number;
 }
+
 function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }: ImageZoomModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
@@ -783,7 +837,9 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
     </Dialog>
   );
 }
+
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
+
 export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
   const productId = params?.id;
@@ -805,6 +861,7 @@ export default function ProductDetail() {
   const { updateData } = useLocalStorage();
   const { toast } = useToast();
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchProduct = async () => {
       if (!productId) return;
@@ -846,7 +903,9 @@ export default function ProductDetail() {
     };
     fetchProduct();
   }, [productId, affiliateId]);
+
   const isInStock = product?.inStock && (product?.stockQuantity || 0) > 0;
+
   const handleAddToCart = () => {
     if (!product || !isInStock) return;
     updateData(addProductToCart.bind(null, product, quantity));
@@ -855,6 +914,7 @@ export default function ProductDetail() {
       description: `${quantity} ${product.name}(s) added.`
     });
   };
+
   const handleBuyNow = () => {
     if (!isInStock) {
       toast({
@@ -867,10 +927,12 @@ export default function ProductDetail() {
     handleAddToCart();
     setIsCheckoutOpen(true);
   };
+
   const handleImageClick = (index: number) => {
     setSelectedImageIndex(index);
     setIsZoomOpen(true);
   };
+
   if (loading) return <div className="py-20 text-center text-xl">Loading product...</div>;
   if (error || !product) return (
     <div className="py-20 bg-white min-h-screen flex items-center justify-center text-center">
@@ -884,6 +946,7 @@ export default function ProductDetail() {
       </div>
     </div>
   );
+
   return (
     <div className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1023,10 +1086,10 @@ export default function ProductDetail() {
                 <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Free Shipping</p>
               </div>
-              {/* <div className="text-center">
+              <div className="text-center">
                 <RotateCcw className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">30-Day Returns</p>
-              </div> */}
+              </div>
               <div className="text-center">
                 <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Secure Payment</p>
@@ -1065,7 +1128,7 @@ export default function ProductDetail() {
                 <div>
                   <p><strong>Weight:</strong> Lightweight</p>
                   <p><strong>Care:</strong> Clean with soft cloth</p>
-                  {/* <p><strong>Warranty:</strong> Lifetime</p> */}
+                  <p><strong>Warranty:</strong> Lifetime</p>
                 </div>
               </div>
             </div>
@@ -1123,6 +1186,7 @@ export default function ProductDetail() {
     </div>
   );
 }
+
 // Add Razorpay type declaration
 declare global {
   interface Window {

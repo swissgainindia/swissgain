@@ -20,14 +20,18 @@ import {
   Sparkles,
   TrendingUp,
   Copy,
-  Plus
+  Plus,
+  ShoppingBag,
+  AlertCircle,
+  Package,
+  RefreshCw
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 
 // Firebase imports
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, push, update, get, onValue, off } from 'firebase/database';
+import { getDatabase, ref, set, push, update, get, onValue, off, query, orderByChild, equalTo } from 'firebase/database';
 
 // Import the new components
 import { OverviewContent } from './components/OverviewContent';
@@ -74,6 +78,211 @@ const getCookie = (name: string) => {
   if (typeof document === 'undefined') return null;
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? m[2] : null;
+};
+
+// Check if user has purchased a product - SIMPLIFIED AND FIXED VERSION
+const hasPurchasedProduct = async (userId: string): Promise<boolean> => {
+  try {
+    console.log('🔍 Checking purchase status for user:', userId);
+    
+    if (!userId) {
+      console.log('❌ No user ID provided');
+      return false;
+    }
+
+    // METHOD 1: First check if user has the purchase flag in affiliate data
+    const affiliateRef = ref(database, `affiliates/${userId}`);
+    const affiliateSnap = await get(affiliateRef);
+    
+    if (affiliateSnap.exists()) {
+      const affiliateData = affiliateSnap.val();
+      console.log('📋 Affiliate data found:', {
+        name: affiliateData.name,
+        email: affiliateData.email,
+        hasPurchasedProduct: affiliateData.hasPurchasedProduct,
+        isAffiliate: affiliateData.isAffiliate
+      });
+      
+      // Check if hasPurchasedProduct flag is true
+      if (affiliateData.hasPurchasedProduct === true) {
+        console.log('✅ Purchase confirmed from affiliate flag (hasPurchasedProduct: true)');
+        return true;
+      }
+    }
+
+    // METHOD 2: Check orders collection for any paid orders
+    console.log('🔍 Checking orders collection...');
+    const ordersRef = ref(database, 'orders');
+    const ordersSnap = await get(ordersRef);
+    
+    if (ordersSnap.exists()) {
+      const orders = ordersSnap.val();
+      console.log('📦 Total orders in database:', Object.keys(orders).length);
+      
+      // Get user email from affiliate data for matching
+      let userEmail = '';
+      if (affiliateSnap.exists()) {
+        userEmail = affiliateSnap.val().email || '';
+      }
+      
+      // Search through ALL orders
+      for (const orderId in orders) {
+        const order = orders[orderId];
+        
+        // Check multiple ways the user might be identified in the order
+        const isUserInOrder = 
+          order.customerId === userId || 
+          order.originalCustomerId === userId ||
+          order.uid === userId ||
+          (order.customerInfo && order.customerInfo.email && userEmail && order.customerInfo.email === userEmail) ||
+          (order.affiliateId === userId);
+        
+        if (isUserInOrder) {
+          console.log('👤 User found in order:', orderId);
+          console.log('📊 Order details:', {
+            orderId,
+            customerId: order.customerId,
+            originalCustomerId: order.originalCustomerId,
+            uid: order.uid,
+            affiliateId: order.affiliateId,
+            customerEmail: order.customerInfo?.email,
+            paymentStatus: order.paymentStatus,
+            status: order.status,
+            productName: order.productName,
+            totalAmount: order.totalAmount
+          });
+          
+          // Check if order is paid/delivered
+          const isPaid = order.paymentStatus === 'paid' || order.status === 'paid' || 
+                        order.status === 'delivered' || order.status === 'shipped' || 
+                        order.status === 'confirmed' || order.status === 'completed' ||
+                        order.paymentStatus === 'completed';
+          
+          if (isPaid) {
+            console.log('✅ Purchase confirmed from paid order');
+            
+            // Update the affiliate record with purchase flag
+            if (affiliateSnap.exists()) {
+              await update(affiliateRef, {
+                hasPurchasedProduct: true,
+                lastPurchaseDate: new Date().toISOString(),
+                lastUpdated: new Date().toISOString(),
+                purchaseVerified: true
+              });
+              console.log('📝 Updated affiliate record with purchase flag');
+            }
+            
+            return true;
+          } else {
+            console.log('⚠️ Order found but not paid:', order.paymentStatus, order.status);
+          }
+        }
+      }
+      
+      // If no direct match, check by scanning all orders for email match
+      if (userEmail) {
+        console.log('🔍 Scanning all orders for email match:', userEmail);
+        for (const orderId in orders) {
+          const order = orders[orderId];
+          if (order.customerInfo && order.customerInfo.email === userEmail) {
+            console.log('📧 Found order with matching email:', orderId);
+            console.log('Order payment status:', order.paymentStatus);
+            
+            if (order.paymentStatus === 'paid' || order.status === 'paid') {
+              console.log('✅ Purchase confirmed by email match');
+              
+              // Update the affiliate record with purchase flag
+              if (affiliateSnap.exists()) {
+                await update(affiliateRef, {
+                  hasPurchasedProduct: true,
+                  lastPurchaseDate: new Date().toISOString(),
+                  lastUpdated: new Date().toISOString(),
+                  purchaseVerified: true
+                });
+              }
+              
+              return true;
+            }
+          }
+        }
+      }
+    } else {
+      console.log('📭 No orders found in database');
+    }
+
+    // METHOD 3: Check for any sales/earnings (for existing active affiliates)
+    if (affiliateSnap.exists()) {
+      const affiliateData = affiliateSnap.val();
+      
+      // If user is an affiliate and has been active for a while, allow access
+      if (affiliateData.isAffiliate && affiliateData.joinDate) {
+        console.log('👑 User is affiliate, checking activity...');
+        
+        // Check affiliate sales
+        const salesRef = ref(database, `affiliateSales/${userId}`);
+        const salesSnap = await get(salesRef);
+        
+        // Check referral earnings
+        const referralsRef = ref(database, `referralEarnings/${userId}`);
+        const referralsSnap = await get(referralsRef);
+        
+        const hasSales = salesSnap.exists() && Object.keys(salesSnap.val()).length > 0;
+        const hasReferrals = referralsSnap.exists() && Object.keys(referralsSnap.val()).length > 0;
+        
+        console.log('📈 Activity check:', { hasSales, hasReferrals });
+        
+        if (hasSales || hasReferrals) {
+          console.log('✅ User has sales/referrals, allowing access');
+          return true;
+        }
+      }
+    }
+
+    console.log('❌ No purchase found for user');
+    return false;
+  } catch (error) {
+    console.error('❌ Error checking purchase status:', error);
+    return false;
+  }
+};
+
+// Direct access function for testing
+const forceAllowAccess = async (userId: string): Promise<boolean> => {
+  try {
+    console.log('🚨 TEMPORARY FIX: Force allowing access for user:', userId);
+    
+    // Directly update the affiliate record to mark as purchased
+    const affiliateRef = ref(database, `affiliates/${userId}`);
+    const affiliateSnap = await get(affiliateRef);
+    
+    if (affiliateSnap.exists()) {
+      await update(affiliateRef, {
+        hasPurchasedProduct: true,
+        lastPurchaseDate: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        purchaseVerified: true,
+        forceAccessGranted: true
+      });
+      console.log('✅ Force updated affiliate record');
+      return true;
+    } else {
+      // Create affiliate record if it doesn't exist
+      await set(affiliateRef, {
+        uid: userId,
+        hasPurchasedProduct: true,
+        lastPurchaseDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        purchaseVerified: true,
+        forceAccessGranted: true
+      });
+      console.log('✅ Created affiliate record with purchase flag');
+      return true;
+    }
+  } catch (error) {
+    console.error('Error in forceAllowAccess:', error);
+    return false;
+  }
 };
 
 // Firebase data functions
@@ -367,6 +576,10 @@ export default function Dashboard() {
   const [showAffiliateLinkDialog, setShowAffiliateLinkDialog] = useState(false);
   const [showReferralLinkDialog, setShowReferralLinkDialog] = useState(false);
   const [linkName, setLinkName] = useState('');
+  const [hasPurchased, setHasPurchased] = useState<boolean | null>(null);
+  const [loadingPurchaseCheck, setLoadingPurchaseCheck] = useState(true);
+  const [showForceAccessBtn, setShowForceAccessBtn] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   const [firebaseData, setFirebaseData] = useState({
     affiliateEarnings: [],
@@ -388,6 +601,98 @@ export default function Dashboard() {
     affiliateData: null
   });
 
+  // Get user ID from cookie
+  const userId = getCookie('swissgain_uid');
+
+  // Check if user has purchased a product
+  useEffect(() => {
+    const checkPurchaseStatus = async () => {
+      if (!userId || !isLoggedIn) {
+        console.log('No user ID or not logged in');
+        setDebugInfo('No user ID or not logged in');
+        return;
+      }
+      
+      console.log('🔄 Starting purchase check for user:', userId);
+      setDebugInfo(`Checking purchase status for user: ${userId}`);
+      setLoadingPurchaseCheck(true);
+      
+      try {
+        // First try normal check
+        const purchased = await hasPurchasedProduct(userId);
+        console.log('Purchase check result:', purchased);
+        setDebugInfo(`Purchase check result: ${purchased ? 'ACCESS GRANTED' : 'ACCESS DENIED'}`);
+        
+        if (!purchased) {
+          // If not purchased, show force access button after 3 seconds
+          setTimeout(() => {
+            setShowForceAccessBtn(true);
+          }, 3000);
+        }
+        
+        setHasPurchased(purchased);
+      } catch (error) {
+        console.error('Error checking purchase status:', error);
+        setDebugInfo(`Error: ${error.message}`);
+        setHasPurchased(false);
+        setShowForceAccessBtn(true);
+      } finally {
+        setLoadingPurchaseCheck(false);
+      }
+    };
+
+    if (isLoggedIn && userId) {
+      checkPurchaseStatus();
+    }
+  }, [userId, isLoggedIn]);
+
+  // Force access button handler
+  const handleForceAccess = async () => {
+    if (!userId) return;
+    
+    setLoadingPurchaseCheck(true);
+    try {
+      const success = await forceAllowAccess(userId);
+      if (success) {
+        toast({
+          title: "Access Granted!",
+          description: "Dashboard access has been manually enabled.",
+          variant: "default",
+        });
+        setHasPurchased(true);
+        setShowForceAccessBtn(false);
+        setDebugInfo('Access manually enabled via force access button');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to enable access. Please try again.",
+        variant: "destructive",
+      });
+      setDebugInfo(`Force access error: ${error.message}`);
+    } finally {
+      setLoadingPurchaseCheck(false);
+    }
+  };
+
+  // Retry purchase check
+  const handleRetryCheck = async () => {
+    if (!userId) return;
+    
+    setLoadingPurchaseCheck(true);
+    setDebugInfo('Retrying purchase check...');
+    try {
+      const purchased = await hasPurchasedProduct(userId);
+      setHasPurchased(purchased);
+      setDebugInfo(`Retry result: ${purchased ? 'ACCESS GRANTED' : 'ACCESS DENIED'}`);
+    } catch (error) {
+      console.error('Error retrying purchase check:', error);
+      setDebugInfo(`Retry error: ${error.message}`);
+    } finally {
+      setLoadingPurchaseCheck(false);
+    }
+  };
+
   // Redirect if not logged in
   useEffect(() => {
     if (!isLoggedIn) {
@@ -400,12 +705,9 @@ export default function Dashboard() {
     }
   }, [isLoggedIn, setLocation, toast]);
 
-  // Get user ID from cookie
-  const userId = getCookie('swissgain_uid');
-
-  // Set up real-time Firebase listeners
+  // Set up real-time Firebase listeners - ONLY if user has purchased
   useEffect(() => {
-    if (!userId || !isLoggedIn) return;
+    if (!userId || !isLoggedIn || hasPurchased === false) return;
 
     // Set up real-time listeners
     const unsubscribeAffiliateEarnings = getAffiliateEarningsData(userId, (earnings) => {
@@ -446,7 +748,7 @@ export default function Dashboard() {
       unsubscribeAffiliateStats();
       unsubscribeAffiliateData();
     };
-  }, [userId, isLoggedIn]);
+  }, [userId, isLoggedIn, hasPurchased]);
 
   const calculateROI = () => {
     const totalEarnings = firebaseData.affiliateStats.affiliateEarnings + firebaseData.affiliateStats.referralEarnings;
@@ -582,8 +884,167 @@ export default function Dashboard() {
     joinDate: userData?.joinedAt ? new Date(userData.joinedAt).toLocaleDateString() : "Not joined",
     tier: userData?.rank ? `Rank ${userData.rank}` : "Starter",
     profileCompletion: (userData?.name && userData?.email && userData?.phone) ? 100 : 60,
-    isAffiliate: userData?.isAffiliate || false
+    isAffiliate: userData?.isAffiliate || false,
+    hasPurchasedProduct: hasPurchased || false
   };
+
+  // Purchase Required Component - UPDATED WITH FORCE ACCESS BUTTON
+  const PurchaseRequiredMessage = () => (
+    <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8">
+      <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mb-6">
+        <ShoppingBag className="h-10 w-10 text-amber-600" />
+      </div>
+      <h2 className="text-2xl font-bold text-foreground mb-4">
+        Purchase Required
+      </h2>
+      <p className="text-muted-foreground mb-6 max-w-md">
+        You have successfully paid the affiliate membership fee of ₹999. 
+        To access the full dashboard features and start earning commissions, 
+        you need to purchase at least one product from our store.
+      </p>
+      
+      {/* Debug Info */}
+      {debugInfo && (
+        <div className="bg-gray-100 p-3 rounded-lg mb-4 max-w-md w-full">
+          <p className="text-xs font-mono text-gray-700 break-all">
+            <strong>Debug Info:</strong> {debugInfo}
+          </p>
+          <p className="text-xs text-gray-600 mt-1">
+            User ID: {userId}
+          </p>
+        </div>
+      )}
+      
+      {/* {showForceAccessBtn && (
+        <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6 max-w-md w-full">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-800 font-semibold mb-2">
+                Having trouble accessing dashboard even after purchase?
+              </p>
+              <p className="text-xs text-red-700 mb-3">
+                If you've already purchased a product but still can't access the dashboard, 
+                click the button below to manually enable access.
+              </p>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={handleForceAccess} 
+                  variant="outline" 
+                  size="sm"
+                  className="border-red-300 text-red-700 hover:bg-red-50"
+                  disabled={loadingPurchaseCheck}
+                >
+                  {loadingPurchaseCheck ? 'Processing...' : 'Enable Dashboard Access Manually'}
+                </Button>
+                <Button 
+                  onClick={handleRetryCheck} 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-gray-600"
+                  disabled={loadingPurchaseCheck}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Retry Purchase Check
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )} */}
+      
+      <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 mb-6 max-w-md w-full">
+        <div className="flex items-start">
+          <AlertCircle className="h-5 w-5 text-amber-600 mr-2 mt-0.5" />
+          <p className="text-sm text-amber-800">
+            <strong>Note:</strong> Your affiliate membership is active, but dashboard access requires a product purchase.
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-4">
+        <Button onClick={() => setLocation('/products')} className="gradient-primary">
+          <ShoppingBag className="mr-2 h-4 w-4" />
+          Browse Products
+        </Button>
+        <Button variant="outline" onClick={() => setLocation('/')}>
+          Go to Homepage
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Loading State
+  if (loadingPurchaseCheck) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Checking Access</CardTitle>
+            <CardDescription>
+              Verifying your purchase status...
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+            <p className="text-sm text-muted-foreground">
+              Checking Firebase for your purchase records...
+            </p>
+            {debugInfo && (
+              <p className="text-xs text-gray-500 mt-2">{debugInfo}</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Purchase Required State
+  if (hasPurchased === false && userData?.isAffiliate) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <header className="bg-background border-b px-6 py-4 mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">SwissGain Dashboard</h1>
+                <p className="text-muted-foreground">
+                  Welcome back, {dashboardUserData.name}!
+                </p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
+            </div>
+          </header>
+          <PurchaseRequiredMessage />
+        </div>
+      </div>
+    );
+  }
+
+  // Not Logged In
+  if (!isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              Please log in to access the dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button onClick={() => setLocation('/')} className="w-full">
+              Go to Homepage
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -607,11 +1068,8 @@ export default function Dashboard() {
         />;
       case 'sales-dashboard':
         return <AffiliateSales />;
-
       case 'payment-request':
         return <PaymentRequest />;
-
-
       case 'referral-earnings':
         return <ReferralEarningsContent
           data={{ membership: { isAffiliate: dashboardUserData.isAffiliate } }}
@@ -633,7 +1091,7 @@ export default function Dashboard() {
       case 'support-center':
         return <UserSupportCenter  />; 
       case 'orders':
-        return  <Orders />;
+        return <Orders />;
       default:
         return <OverviewContent
           data={{ membership: { isAffiliate: dashboardUserData.isAffiliate, rank: userData?.rank || 1 } }}
@@ -646,26 +1104,6 @@ export default function Dashboard() {
         />;
     }
   };
-
-  if (!isLoggedIn) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              Please log in to access the dashboard.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button onClick={() => setLocation('/')} className="w-full">
-              Go to Homepage
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="flex bg-background min-h-screen my-5 border">
@@ -796,14 +1234,6 @@ export default function Dashboard() {
               onClick={() => setActiveTab('billing')}
               collapsed={sidebarCollapsed}
             />
-            {/* <SidebarItem
-              icon={<BarChart3 className="h-4 w-4" />}
-              label="Reports"
-              active={activeTab === 'reports'}
-              onClick={() => setActiveTab('reports')}
-              collapsed={sidebarCollapsed}
-            /> */}
-
             <SidebarItem
               icon={<BarChart3 className="h-4 w-4" />}
               label="Payment Request"
@@ -811,7 +1241,6 @@ export default function Dashboard() {
               onClick={() => setActiveTab('payment-request')}
               collapsed={sidebarCollapsed}
             />
-
             <SidebarItem
               icon={<BarChart3 className="h-4 w-4" />}
               label="Support Center"
@@ -819,9 +1248,8 @@ export default function Dashboard() {
               onClick={() => setActiveTab('support-center')}
               collapsed={sidebarCollapsed}
             />
-
             <SidebarItem
-              icon={<BarChart3 className="h-4 w-4" />}
+              icon={<Package className="h-4 w-4" />}
               label="Orders"
               active={activeTab === 'orders'}
               onClick={() => setActiveTab('orders')}
@@ -839,6 +1267,11 @@ export default function Dashboard() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{dashboardUserData.name}</p>
                 <p className="text-xs text-muted-foreground truncate">{dashboardUserData.tier}</p>
+                {hasPurchased && (
+                  <Badge variant="outline" className="mt-1 text-xs bg-green-50 text-green-700 border-green-200">
+                    Product Owner
+                  </Badge>
+                )}
               </div>
             )}
           </div>
@@ -854,17 +1287,14 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold capitalize">{activeTab.replace('-', ' ')}</h1>
               <p className="text-muted-foreground">
                 Welcome back, {dashboardUserData.name}!
+                {hasPurchased && (
+                  <span className="ml-2 text-green-600 font-medium">
+                    ✓ Product Verified
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              {/* <Button variant="outline" size="sm">
-                <Bell className="h-4 w-4 mr-2" />
-                Notifications
-              </Button> */}
-              {/* <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button> */}
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout

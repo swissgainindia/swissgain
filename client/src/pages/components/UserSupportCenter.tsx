@@ -762,11 +762,11 @@ export default function UserSupportCenter() {
                             <FileText className="h-4 w-4" />
                             FAQ
                         </TabsTrigger>
-                        <TabsTrigger value="new-ticket" className="flex items-center gap-2">
+                        <TabsTrigger value="new-ticket" className="flex items-center gap-2 hidden">
                             <Plus className="h-4 w-4" />
                             New Ticket
                         </TabsTrigger>
-                        <TabsTrigger value="my-tickets" className="flex items-center gap-2">
+                        <TabsTrigger value="my-tickets" className="flex items-center gap-2 hidden">
                             <MessageSquare className="h-4 w-4" />
                             My Tickets
                         </TabsTrigger>
@@ -1154,7 +1154,7 @@ export default function UserSupportCenter() {
                                         </div>
 
                                         {/* Live Chat */}
-                                        <div className="flex items-start gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                                        <div className="flex items-start gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors hidden">
                                             <div className="p-2 bg-purple-100 rounded-full">
                                                 <MessageSquare className="h-6 w-6 text-purple-600" />
                                             </div>
@@ -1173,7 +1173,7 @@ export default function UserSupportCenter() {
                             </div>
 
                             {/* Support Resources */}
-                            <div className="space-y-6">
+                            <div className="space-y-6 hidden">
                                 {/* Quick Links */}
                                 <Card className="border-0 shadow-lg">
                                     <CardHeader>
@@ -1256,7 +1256,7 @@ export default function UserSupportCenter() {
                 </Tabs>
 
                 {/* Support Satisfaction */}
-                <Card className="mt-8 border-0 shadow-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                <Card className="mt-8 border-0 shadow-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hidden">
                     <CardContent className="p-6 text-center">
                         <div className="max-w-2xl mx-auto">
                             <h3 className="text-xl font-bold mb-2">How was your support experience?</h3>

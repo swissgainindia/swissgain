@@ -364,7 +364,7 @@ export function BillingContent({ affiliateStats, walletBalance = 0 }: BillingCon
         </Card>
 
         {/* Payment Method */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Payment Method</CardTitle>
             <CardDescription>Your default payment method</CardDescription>
@@ -395,7 +395,7 @@ export function BillingContent({ affiliateStats, walletBalance = 0 }: BillingCon
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Billing Overview */}
         <Card>
@@ -421,7 +421,7 @@ export function BillingContent({ affiliateStats, walletBalance = 0 }: BillingCon
         </Card>
 
         {/* Support Section */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Need Help?</CardTitle>
             <CardDescription>Contact our support team</CardDescription>
@@ -441,7 +441,7 @@ export function BillingContent({ affiliateStats, walletBalance = 0 }: BillingCon
               Documentation
             </Button>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Withdrawal Modal */}

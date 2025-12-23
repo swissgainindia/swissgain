@@ -106,7 +106,7 @@ export function ProfileContent({ userData, data, updateData }: ProfileContentPro
                   disabled={!isEditing}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 hidden">
                 <Label htmlFor="location">Location</Label>
                 <Input
                   id="location"
@@ -193,7 +193,7 @@ export function ProfileContent({ userData, data, updateData }: ProfileContentPro
                   {userData.phone ? "Complete" : "Incomplete"}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between hidden">
                 <span className="text-sm">Location</span>
                 <Badge variant={userData.location !== "Not specified" ? "default" : "secondary"}>
                   {userData.location !== "Not specified" ? "Complete" : "Incomplete"}
@@ -216,7 +216,7 @@ export function ProfileContent({ userData, data, updateData }: ProfileContentPro
         </Card>
 
         {/* Account Security */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Account Security</CardTitle>
             <CardDescription>
@@ -252,7 +252,7 @@ export function ProfileContent({ userData, data, updateData }: ProfileContentPro
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     </div>
   );
