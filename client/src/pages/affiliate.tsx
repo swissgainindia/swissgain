@@ -455,18 +455,32 @@ export default function Affiliate() {
       }
 
       // Validate referral code if provided and not already validated
-      if (referralCode && !referrerId) {
-        await fetchReferrer(referralCode);
-        if (!referrerId) {
-          toast({
-            title: 'Invalid Referral Code',
-            description: 'The entered referral code is not valid. You can proceed without it.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
-      }
+      // Referral code is REQUIRED
+if (!referralCode) {
+  toast({
+    title: 'Referral Code Required',
+    description: 'Please enter a valid referral code to continue.',
+    variant: 'destructive',
+  });
+  setLoading(false);
+  return;
+}
+
+// Validate referral code
+if (referralCode && !referrerId) {
+  await fetchReferrer(referralCode);
+
+  if (!referrerId) {
+    toast({
+      title: 'Invalid Referral Code',
+      description: 'The referral code you entered is invalid.',
+      variant: 'destructive',
+    });
+    setLoading(false);
+    return;
+  }
+}
+
       
       const paymentInitiated = await initiateRazorpayPayment();
      
@@ -657,9 +671,12 @@ export default function Affiliate() {
                       required
                        disabled={!!referralCode}
                     />
-                    {referrerName && (
-                      <p className="text-xs text-green-600 mt-1">Valid! Referred by {referrerName}</p>
-                    )}
+                  {referralCode && !referrerId && (
+  <p className="text-xs text-red-600 mt-1">
+    Invalid referral code
+  </p>
+)}
+
                   </div>
                   <div>
                     <Label htmlFor="reg-username">Username *</Label>
@@ -711,7 +728,16 @@ export default function Affiliate() {
                   <Button variant="outline" onClick={() => setShowPayment(false)} disabled={loading}>
                     Cancel
                   </Button>
-                  <Button onClick={handlePayment} disabled={loading || !razorpayLoaded}>
+                  <Button
+  onClick={handlePayment}
+  disabled={
+    loading ||
+    !razorpayLoaded ||
+    !referralCode ||
+    !referrerId
+  }
+>
+
                     {loading ? 'Processing...' : !razorpayLoaded ? 'Loading Payment...' : 'Pay ₹999'} {/* Changed from ₹999 to ₹1 */}
                   </Button>
                 </div>
