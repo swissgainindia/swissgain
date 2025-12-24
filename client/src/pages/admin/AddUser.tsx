@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, get, remove } from 'firebase/database';
+import { getDatabase, ref, set, get, remove, update } from 'firebase/database';
 import { Handshake, UserPlus, Users, Edit, Trash2 } from 'lucide-react';
 
 const firebaseConfig = {
@@ -77,11 +77,8 @@ const checkEmailExists = async (email: string, excludeUid?: string): Promise<boo
   try {
     const affiliatesRef = ref(database, 'affiliates');
     const snap = await get(affiliatesRef);
-   
     if (snap.exists()) {
       const affiliates = snap.val();
-     
-      // Check if any affiliate has this email, excluding the current uid
       for (const affiliateData of Object.values(affiliates)) {
         const data = affiliateData as any;
         if (data.email === email && data.uid !== excludeUid) {
@@ -100,11 +97,8 @@ const checkUsernameExists = async (username: string, excludeUid?: string): Promi
   try {
     const affiliatesRef = ref(database, 'affiliates');
     const snap = await get(affiliatesRef);
-   
     if (snap.exists()) {
       const affiliates = snap.val();
-     
-      // Check if any affiliate has this username, excluding the current uid
       for (const affiliateData of Object.values(affiliates)) {
         const data = affiliateData as any;
         if (data.username === username && data.uid !== excludeUid) {
@@ -123,11 +117,8 @@ const checkReferralCodeExists = async (code: string, excludeUid?: string): Promi
   try {
     const affiliatesRef = ref(database, 'affiliates');
     const snap = await get(affiliatesRef);
-   
     if (snap.exists()) {
       const affiliates = snap.val();
-     
-      // Check if any affiliate has this referral code, excluding the current uid
       for (const affiliateData of Object.values(affiliates)) {
         const data = affiliateData as any;
         if (data.referralCode === code && data.uid !== excludeUid) {
@@ -162,6 +153,8 @@ interface Affiliate {
   referralCode: string;
   referralLink: string;
   hasEditedReferral?: boolean;
+  hasPurchasedProduct?: boolean;
+  forceAccessGranted?: boolean;
 }
 
 const fetchAffiliates = async (setAffiliates: React.Dispatch<React.SetStateAction<Affiliate[]>>) => {
@@ -174,7 +167,6 @@ const fetchAffiliates = async (setAffiliates: React.Dispatch<React.SetStateActio
         ...d,
         uid,
       })) as Affiliate[];
-      // Sort by joinDate descending
       affiliatesList.sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
       setAffiliates(affiliatesList);
     } else {
@@ -186,11 +178,40 @@ const fetchAffiliates = async (setAffiliates: React.Dispatch<React.SetStateActio
   }
 };
 
+// Shared function to manage dashboard access
+const updateDashboardAccess = async (uid: string, grant: boolean) => {
+  try {
+    const affiliateRef = ref(database, `affiliates/${uid}`);
+    const updates: any = {
+      lastUpdated: new Date().toISOString(),
+    };
+
+    if (grant) {
+      updates.hasPurchasedProduct = true;
+      updates.lastPurchaseDate = new Date().toISOString();
+      updates.purchaseVerified = true;
+      updates.forceAccessGranted = true;
+    } else {
+      updates.hasPurchasedProduct = false;
+      updates.lastPurchaseDate = null;
+      updates.purchaseVerified = false;
+      updates.forceAccessGranted = false;
+    }
+
+    await update(affiliateRef, updates);
+    return true;
+  } catch (error) {
+    console.error('Error updating dashboard access:', error);
+    return false;
+  }
+};
+
 const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = ({ onSuccess, onClose }) => {
   const { toast } = useToast();
   const [userDetails, setUserDetails] = useState<UserDetails>({ name: '', email: '', phone: '', username: '', password: '' });
   const [manualReferral, setManualReferral] = useState(false);
   const [customReferralCode, setCustomReferralCode] = useState('');
+  const [grantDirectAccess, setGrantDirectAccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -201,105 +222,62 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!userDetails.name || !userDetails.email || !userDetails.phone || !userDetails.username || !userDetails.password) {
-      toast({
-        title: 'Incomplete Details',
-        description: 'Please fill all required fields.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Incomplete Details', description: 'Please fill all required fields.', variant: 'destructive' });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userDetails.email)) {
-      toast({
-        title: 'Invalid Email',
-        description: 'Please enter a valid email address.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Email', description: 'Please enter a valid email address.', variant: 'destructive' });
       return;
     }
-   
+
     if (userDetails.phone.length < 10) {
-      toast({
-        title: 'Invalid Phone',
-        description: 'Please enter a valid phone number.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Phone', description: 'Please enter a valid phone number.', variant: 'destructive' });
       return;
     }
-
     if (userDetails.username.length < 3) {
-      toast({
-        title: 'Invalid Username',
-        description: 'Username must be at least 3 characters.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Username', description: 'Username must be at least 3 characters.', variant: 'destructive' });
       return;
     }
-
     if (userDetails.password.length < 6) {
-      toast({
-        title: 'Invalid Password',
-        description: 'Password must be at least 6 characters.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Password', description: 'Password must be at least 6 characters.', variant: 'destructive' });
       return;
     }
 
-    let referralCode: string;
+    let referralCode: string = '';
     let hasEditedReferral: boolean = false;
 
     if (manualReferral) {
       if (customReferralCode.length < 6) {
-        toast({
-          title: 'Invalid Referral Code',
-          description: 'Referral code must be at least 6 characters.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Invalid Referral Code', description: 'Referral code must be at least 6 characters.', variant: 'destructive' });
         return;
       }
       const codeExists = await checkReferralCodeExists(customReferralCode);
       if (codeExists) {
-        toast({
-          title: 'Referral Code Already Exists',
-          description: 'This referral code is already in use.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Referral Code Already Exists', description: 'This referral code is already in use.', variant: 'destructive' });
         return;
       }
       referralCode = customReferralCode;
       hasEditedReferral = true;
-    } else {
-      referralCode = '';
     }
 
     setLoading(true);
-
     try {
-      // Check if email already exists
       const emailExists = await checkEmailExists(userDetails.email);
       if (emailExists) {
-        toast({
-          title: 'Email Already Exists',
-          description: 'An affiliate with this email already exists.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Email Already Exists', description: 'An affiliate with this email already exists.', variant: 'destructive' });
         return;
       }
 
-      // Check if username already exists
       const usernameExists = await checkUsernameExists(userDetails.username);
       if (usernameExists) {
-        toast({
-          title: 'Username Already Exists',
-          description: 'An affiliate with this username already exists.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Username Already Exists', description: 'An affiliate with this username already exists.', variant: 'destructive' });
         return;
       }
 
-      // Generate user ID
       const uid = generateUserId();
       setUserId(uid);
 
@@ -307,9 +285,8 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
         referralCode = generateReferralCode(userDetails.name, uid);
       }
 
-      // Prepare user data
-      const userData = {
-        uid: uid,
+      const userData: Affiliate = {
+        uid,
         name: userDetails.name,
         email: userDetails.email,
         phone: userDetails.phone,
@@ -317,36 +294,38 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
         password: userDetails.password,
         isAffiliate: true,
         joinDate: new Date().toISOString(),
-        referralCode: referralCode,
+        referralCode,
         referralLink: `${window.location.origin}/affiliate?ref=${referralCode}`,
-        hasEditedReferral: hasEditedReferral,
+        hasEditedReferral,
+        hasPurchasedProduct: false,
       };
 
-      // Save to Firebase
       const userRef = ref(database, `affiliates/${uid}`);
       await set(userRef, userData);
 
-      // Reset form
+      if (grantDirectAccess) {
+        const success = await updateDashboardAccess(uid, true);
+        if (success) {
+          toast({ title: 'Direct Access Granted 🎉', description: 'Full dashboard access enabled.' });
+        }
+      }
+
       setUserDetails({ name: '', email: '', phone: '', username: '', password: '' });
       setManualReferral(false);
       setCustomReferralCode('');
+      setGrantDirectAccess(false);
       setUserId(null);
 
       toast({
         title: 'User Added Successfully! 🎉',
-        description: `New affiliate "${userDetails.name}" has been created with ID: ${uid}. Referral Code: ${referralCode}`,
+        description: `New affiliate "${userDetails.name}" created. ID: ${uid}`,
       });
 
-      console.log('User added:', userData);
-      onSuccess(); // Refetch the list
+      onSuccess();
       if (onClose) onClose();
     } catch (error) {
       console.error('Error adding user:', error);
-      toast({
-        title: 'Add User Failed',
-        description: 'Failed to add user. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Add User Failed', description: 'Failed to add user.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -359,101 +338,48 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
           <UserPlus className="h-7 w-7 text-primary" />
         </div>
         <CardTitle className="text-2xl font-bold text-foreground">Add New Affiliate</CardTitle>
-        <CardDescription>
-          Create a new affiliate account manually (Admin only - no payment required)
-        </CardDescription>
+        <CardDescription>Create a new affiliate account manually (Admin only)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleSubmit}>
           <div className="space-y-3">
             <div>
               <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Enter full name"
-                value={userDetails.name}
-                onChange={handleInputChange}
-                required
-              />
+              <Input id="name" name="name" type="text" placeholder="Enter full name" value={userDetails.name} onChange={handleInputChange} required />
             </div>
             <div>
               <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Enter email"
-                value={userDetails.email}
-                onChange={handleInputChange}
-                required
-              />
+              <Input id="email" name="email" type="email" placeholder="Enter email" value={userDetails.email} onChange={handleInputChange} required />
             </div>
             <div>
               <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                placeholder="Enter phone number"
-                value={userDetails.phone}
-                onChange={handleInputChange}
-                required
-              />
+              <Input id="phone" name="phone" type="tel" placeholder="Enter phone number" value={userDetails.phone} onChange={handleInputChange} required />
             </div>
             <div>
               <Label htmlFor="username">Username *</Label>
-              <Input
-                id="username"
-                name="username"
-                type="text"
-                placeholder="Choose a unique username (min 3 chars)"
-                value={userDetails.username}
-                onChange={handleInputChange}
-                required
-              />
+              <Input id="username" name="username" type="text" placeholder="Unique username (min 3 chars)" value={userDetails.username} onChange={handleInputChange} required />
             </div>
             <div>
               <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Create a password (min 6 chars)"
-                value={userDetails.password}
-                onChange={handleInputChange}
-                required
-              />
+              <Input id="password" name="password" type="password" placeholder="Password (min 6 chars)" value={userDetails.password} onChange={handleInputChange} required />
             </div>
+
             <div>
               <Label>Referral Code *</Label>
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="auto-ref"
-                    name="ref-type"
-                    checked={!manualReferral}
-                    onChange={() => setManualReferral(false)}
-                  />
+                  <input type="radio" id="auto-ref" name="ref-type" checked={!manualReferral} onChange={() => setManualReferral(false)} />
                   <Label htmlFor="auto-ref" className="cursor-pointer">Auto-generate</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="manual-ref"
-                    name="ref-type"
-                    checked={manualReferral}
-                    onChange={() => setManualReferral(true)}
-                  />
+                  <input type="radio" id="manual-ref" name="ref-type" checked={manualReferral} onChange={() => setManualReferral(true)} />
                   <Label htmlFor="manual-ref" className="cursor-pointer">Manual</Label>
                 </div>
               </div>
               {manualReferral && (
                 <Input
                   type="text"
-                  placeholder="Enter custom referral code (min 6 chars)"
+                  placeholder="Custom referral code (min 6 chars)"
                   value={customReferralCode}
                   onChange={(e) => setCustomReferralCode(e.target.value)}
                   className="mt-2"
@@ -461,7 +387,25 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
                 />
               )}
             </div>
+
+            <div className="pt-4 border-t">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="grant-direct-access-add"
+                  checked={grantDirectAccess}
+                  onChange={(e) => setGrantDirectAccess(e.target.checked)}
+                />
+                <Label htmlFor="grant-direct-access-add" className="cursor-pointer font-semibold">
+                  Grant Direct Dashboard Access
+                </Label>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1 ml-8">
+                Enables full dashboard access immediately (bypasses product purchase).
+              </p>
+            </div>
           </div>
+
           <Button type="submit" className="w-full mt-6" disabled={loading}>
             {loading ? 'Adding...' : (
               <>
@@ -471,11 +415,10 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
             )}
           </Button>
         </form>
+
         {userId && (
           <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-sm text-green-700">
-              <strong>Generated ID:</strong> {userId}
-            </p>
+            <p className="text-sm text-green-700"><strong>Generated ID:</strong> {userId}</p>
           </div>
         )}
       </CardContent>
@@ -485,13 +428,14 @@ const AddUserForm: React.FC<{ onSuccess: () => void; onClose?: () => void }> = (
 
 const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onClose: () => void }> = ({ affiliate, onSuccess, onClose }) => {
   const { toast } = useToast();
-  const [userDetails, setUserDetails] = useState<UserDetails>({ 
-    name: affiliate.name, 
-    email: affiliate.email, 
-    phone: affiliate.phone, 
-    username: affiliate.username, 
-    password: affiliate.password 
+  const [userDetails, setUserDetails] = useState<UserDetails>({
+    name: affiliate.name,
+    email: affiliate.email,
+    phone: affiliate.phone,
+    username: affiliate.username,
+    password: affiliate.password
   });
+  const [grantDirectAccess, setGrantDirectAccess] = useState(!!affiliate.hasPurchasedProduct);
   const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -501,80 +445,46 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!userDetails.name || !userDetails.email || !userDetails.phone || !userDetails.username || !userDetails.password) {
-      toast({
-        title: 'Incomplete Details',
-        description: 'Please fill all required fields.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Incomplete Details', description: 'Please fill all required fields.', variant: 'destructive' });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userDetails.email)) {
-      toast({
-        title: 'Invalid Email',
-        description: 'Please enter a valid email address.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Email', description: 'Please enter a valid email address.', variant: 'destructive' });
       return;
     }
-   
+
     if (userDetails.phone.length < 10) {
-      toast({
-        title: 'Invalid Phone',
-        description: 'Please enter a valid phone number.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Phone', description: 'Please enter a valid phone number.', variant: 'destructive' });
       return;
     }
-
     if (userDetails.username.length < 3) {
-      toast({
-        title: 'Invalid Username',
-        description: 'Username must be at least 3 characters.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Username', description: 'Username must be at least 3 characters.', variant: 'destructive' });
       return;
     }
-
     if (userDetails.password.length < 6) {
-      toast({
-        title: 'Invalid Password',
-        description: 'Password must be at least 6 characters.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Password', description: 'Password must be at least 6 characters.', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
-
     try {
-      // Check if email already exists (exclude current uid)
       const emailExists = await checkEmailExists(userDetails.email, affiliate.uid);
       if (emailExists) {
-        toast({
-          title: 'Email Already Exists',
-          description: 'An affiliate with this email already exists.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Email Already Exists', description: 'An affiliate with this email already exists.', variant: 'destructive' });
         return;
       }
 
-      // Check if username already exists (exclude current uid)
       const usernameExists = await checkUsernameExists(userDetails.username, affiliate.uid);
       if (usernameExists) {
-        toast({
-          title: 'Username Already Exists',
-          description: 'An affiliate with this username already exists.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Username Already Exists', description: 'An affiliate with this username already exists.', variant: 'destructive' });
         return;
       }
 
-      // Prepare updated data (referral code not changed here)
-      const updatedData = {
-        ...affiliate,
+      const updatedData: Partial<Affiliate> = {
         name: userDetails.name,
         email: userDetails.email,
         phone: userDetails.phone,
@@ -582,25 +492,32 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
         password: userDetails.password,
       };
 
-      // Update in Firebase
       const userRef = ref(database, `affiliates/${affiliate.uid}`);
-      await set(userRef, updatedData);
+      await set(userRef, { ...affiliate, ...updatedData });
 
-      toast({
-        title: 'User Updated Successfully! 🎉',
-        description: `Affiliate "${userDetails.name}" has been updated.`,
-      });
+      // Update dashboard access if changed
+      const shouldHaveAccess = grantDirectAccess;
+      const currentlyHasAccess = !!affiliate.hasPurchasedProduct;
 
-      console.log('User updated:', updatedData);
-      onSuccess(); // Refetch the list
+      if (shouldHaveAccess !== currentlyHasAccess) {
+        const success = await updateDashboardAccess(affiliate.uid, shouldHaveAccess);
+        if (success) {
+          toast({
+            title: shouldHaveAccess ? 'Access Granted' : 'Access Revoked',
+            description: shouldHaveAccess
+              ? 'Full dashboard access has been enabled.'
+              : 'Dashboard access has been restricted.',
+          });
+        }
+      }
+
+      toast({ title: 'User Updated Successfully! 🎉', description: `Affiliate "${userDetails.name}" updated.` });
+
+      onSuccess();
       onClose();
     } catch (error) {
       console.error('Error updating user:', error);
-      toast({
-        title: 'Update Failed',
-        description: 'Failed to update user. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Update Failed', description: 'Failed to update user.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -611,72 +528,52 @@ const EditUserForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; onCl
       <DialogHeader>
         <DialogTitle>Edit Affiliate</DialogTitle>
         <DialogDescription>
-          Update the affiliate details below. Referral code can be edited separately.
+          Update affiliate details and manage dashboard access.
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit}>
         <div className="space-y-3">
           <div>
-            <Label htmlFor="name">Full Name *</Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              placeholder="Enter full name"
-              value={userDetails.name}
-              onChange={handleInputChange}
-              required
-            />
+            <Label htmlFor="name-edit">Full Name *</Label>
+            <Input id="name-edit" name="name" type="text" value={userDetails.name} onChange={handleInputChange} required />
           </div>
           <div>
-            <Label htmlFor="email">Email Address *</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="Enter email"
-              value={userDetails.email}
-              onChange={handleInputChange}
-              required
-            />
+            <Label htmlFor="email-edit">Email Address *</Label>
+            <Input id="email-edit" name="email" type="email" value={userDetails.email} onChange={handleInputChange} required />
           </div>
           <div>
-            <Label htmlFor="phone">Phone Number *</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              placeholder="Enter phone number"
-              value={userDetails.phone}
-              onChange={handleInputChange}
-              required
-            />
+            <Label htmlFor="phone-edit">Phone Number *</Label>
+            <Input id="phone-edit" name="phone" type="tel" value={userDetails.phone} onChange={handleInputChange} required />
           </div>
           <div>
-            <Label htmlFor="username">Username *</Label>
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              placeholder="Choose a unique username (min 3 chars)"
-              value={userDetails.username}
-              onChange={handleInputChange}
-              required
-            />
+            <Label htmlFor="username-edit">Username *</Label>
+            <Input id="username-edit" name="username" type="text" value={userDetails.username} onChange={handleInputChange} required />
           </div>
           <div>
-            <Label htmlFor="password">Password *</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Update password (min 6 chars)"
-              value={userDetails.password}
-              onChange={handleInputChange}
-              required
-            />
+            <Label htmlFor="password-edit">Password *</Label>
+            <Input id="password-edit" name="password" type="password" value={userDetails.password} onChange={handleInputChange} required />
+          </div>
+
+          <div className="pt-4 border-t">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="grant-direct-access-edit"
+                checked={grantDirectAccess}
+                onChange={(e) => setGrantDirectAccess(e.target.checked)}
+              />
+              <Label htmlFor="grant-direct-access-edit" className="cursor-pointer font-semibold">
+                Grant Direct Dashboard Access
+              </Label>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1 ml-8">
+              {grantDirectAccess
+                ? 'User currently has full dashboard access.'
+                : 'User requires product purchase for dashboard access.'}
+            </p>
           </div>
         </div>
+
         <DialogFooter className="mt-6">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
@@ -709,20 +606,12 @@ const EditReferralForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; 
 
     if (manualReferral) {
       if (customReferralCode.length < 6) {
-        toast({
-          title: 'Invalid Referral Code',
-          description: 'Referral code must be at least 6 characters.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Invalid Referral Code', description: 'Referral code must be at least 6 characters.', variant: 'destructive' });
         return;
       }
       const codeExists = await checkReferralCodeExists(customReferralCode, affiliate.uid);
       if (codeExists) {
-        toast({
-          title: 'Referral Code Already Exists',
-          description: 'This referral code is already in use.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Referral Code Already Exists', description: 'This referral code is already in use.', variant: 'destructive' });
         return;
       }
       finalReferralCode = customReferralCode;
@@ -731,9 +620,7 @@ const EditReferralForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; 
     }
 
     setLoading(true);
-
     try {
-      // Prepare updated data
       const updatedData = {
         ...affiliate,
         referralCode: finalReferralCode,
@@ -741,25 +628,19 @@ const EditReferralForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; 
         hasEditedReferral: true,
       };
 
-      // Update in Firebase
       const userRef = ref(database, `affiliates/${affiliate.uid}`);
       await set(userRef, updatedData);
 
       toast({
         title: 'Referral Code Updated Successfully! 🎉',
-        description: `Referral code for "${affiliate.name}" has been updated to: ${finalReferralCode}`,
+        description: `Referral code updated to: ${finalReferralCode}`,
       });
 
-      console.log('Referral code updated:', updatedData);
-      onSuccess(); // Refetch the list
+      onSuccess();
       onClose();
     } catch (error) {
       console.error('Error updating referral code:', error);
-      toast({
-        title: 'Update Failed',
-        description: 'Failed to update referral code. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Update Failed', description: 'Failed to update referral code.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -769,42 +650,23 @@ const EditReferralForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; 
     <DialogContent className="sm:max-w-[425px]">
       <DialogHeader>
         <DialogTitle>Edit Referral Code</DialogTitle>
-        <DialogDescription>
-          Update the referral code for this affiliate (one-time edit).
-        </DialogDescription>
+        <DialogDescription>Update the referral code (one-time edit).</DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit}>
         <div className="space-y-3">
           <div>
             <Label>Current Referral Code</Label>
-            <Input
-              type="text"
-              value={affiliate.referralCode}
-              disabled
-              className="bg-muted"
-            />
+            <Input type="text" value={affiliate.referralCode} disabled className="bg-muted" />
           </div>
           <div>
             <Label>New Referral Code *</Label>
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="auto-ref-edit"
-                  name="ref-type-edit"
-                  checked={!manualReferral}
-                  onChange={() => setManualReferral(false)}
-                />
+                <input type="radio" id="auto-ref-edit" name="ref-type-edit" checked={!manualReferral} onChange={() => setManualReferral(false)} />
                 <Label htmlFor="auto-ref-edit" className="cursor-pointer">Auto-generate</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="manual-ref-edit"
-                  name="ref-type-edit"
-                  checked={manualReferral}
-                  onChange={() => setManualReferral(true)}
-                />
+                <input type="radio" id="manual-ref-edit" name="ref-type-edit" checked={manualReferral} onChange={() => setManualReferral(true)} />
                 <Label htmlFor="manual-ref-edit" className="cursor-pointer">Manual</Label>
               </div>
             </div>
@@ -817,15 +679,11 @@ const EditReferralForm: React.FC<{ affiliate: Affiliate; onSuccess: () => void; 
               disabled={!manualReferral}
               required
             />
-            {!manualReferral && (
-              <p className="text-xs text-muted-foreground mt-1">Auto-generated: {generatedCode}</p>
-            )}
+            {!manualReferral && <p className="text-xs text-muted-foreground mt-1">Auto-generated: {generatedCode}</p>}
           </div>
         </div>
         <DialogFooter className="mt-6">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={loading}>
             {loading ? 'Updating...' : 'Update Referral Code'}
           </Button>
@@ -847,32 +705,18 @@ const AdminAffiliates: React.FC = () => {
     fetchAffiliates(setAffiliates);
   }, []);
 
-  const handleAddSuccess = () => {
-    fetchAffiliates(setAffiliates);
-  };
-
-  const handleEditSuccess = () => {
-    fetchAffiliates(setAffiliates);
-  };
+  const handleAddSuccess = () => fetchAffiliates(setAffiliates);
+  const handleEditSuccess = () => fetchAffiliates(setAffiliates);
 
   const handleDelete = async () => {
     if (!deletingUid) return;
     try {
-      const deleteRef = ref(database, `affiliates/${deletingUid}`);
-      await remove(deleteRef);
-      toast({
-        title: 'User Deleted Successfully!',
-        description: 'The affiliate has been removed.',
-      });
+      await remove(ref(database, `affiliates/${deletingUid}`));
+      toast({ title: 'User Deleted Successfully!', description: 'The affiliate has been removed.' });
       setDeletingUid(null);
       fetchAffiliates(setAffiliates);
     } catch (error) {
-      console.error('Error deleting user:', error);
-      toast({
-        title: 'Delete Failed',
-        description: 'Failed to delete user. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Delete Failed', description: 'Failed to delete user.', variant: 'destructive' });
     }
   };
 
@@ -919,7 +763,7 @@ const AdminAffiliates: React.FC = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the affiliate and remove their data.
+                This action cannot be undone. This will permanently delete the affiliate.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -953,6 +797,7 @@ const AdminAffiliates: React.FC = () => {
                       <TableHead>Username</TableHead>
                       <TableHead>Password</TableHead>
                       <TableHead>Referral Code</TableHead>
+                      <TableHead>Access</TableHead>
                       <TableHead>Join Date</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -967,8 +812,13 @@ const AdminAffiliates: React.FC = () => {
                         <TableCell className="text-muted-foreground font-mono text-sm">{affiliate.password}</TableCell>
                         <TableCell className="font-mono text-sm">{affiliate.referralCode}</TableCell>
                         <TableCell>
-                          {new Date(affiliate.joinDate).toLocaleDateString()}
+                          {affiliate.hasPurchasedProduct ? (
+                            <span className="text-green-600 font-medium">Full Access</span>
+                          ) : (
+                            <span className="text-amber-600">Purchase Required</span>
+                          )}
                         </TableCell>
+                        <TableCell>{new Date(affiliate.joinDate).toLocaleDateString()}</TableCell>
                         <TableCell className="space-x-2">
                           <Button variant="outline" size="sm" onClick={() => setEditingAffiliate(affiliate)}>
                             <Edit className="h-4 w-4 mr-1" />
@@ -980,11 +830,7 @@ const AdminAffiliates: React.FC = () => {
                               Edit Referral
                             </Button>
                           )}
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            onClick={() => setDeletingUid(affiliate.uid)}
-                          >
+                          <Button variant="destructive" size="sm" onClick={() => setDeletingUid(affiliate.uid)}>
                             <Trash2 className="h-4 w-4 mr-1" />
                             Delete
                           </Button>
