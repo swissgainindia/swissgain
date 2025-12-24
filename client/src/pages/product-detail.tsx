@@ -423,7 +423,7 @@ const markUserAsPurchased = async (userId: string) => {
   }
 };
 
-// Checkout Modal with Razorpay Integration - RESPONSIVE FIXES
+// Checkout Modal with Razorpay Integration
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -500,7 +500,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     }
   };
 
-  // Initiate Razorpay Payment with mobile fixes
+  // Initiate Razorpay Payment
   const initiateRazorpayPayment = async (orderData: OrderData) => {
     if (!razorpayLoaded) {
       toast({
@@ -518,10 +518,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
       return false;
     }
-    
-    // Check mobile device
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
     const options = {
       key: RAZORPAY_CONFIG.key_id,
       amount: totalAmount * 100, // Convert to paise
@@ -576,7 +572,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       theme: {
         color: '#b45309',
       },
-      // MOBILE FIXES
       modal: {
         ondismiss: function() {
           toast({
@@ -584,66 +579,11 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
             description: 'You cancelled the payment process.',
             variant: 'default',
           });
-        },
-        // Prevent modal scaling issues on mobile
-        escape: true,
-        animation: true
-      },
-      // Additional mobile optimizations
-      retry: {
-        enabled: true,
-        max_count: 2
-      },
-      timeout: 300,
-      remember_customer: true,
-      // Fix for mobile viewport
-      config: {
-        display: {
-          blocks: {
-            banks: {
-              name: "Bank Offer",
-              instruments: [
-                {
-                  method: "card",
-                  issuers: ["HDFC", "ICICI", "AXIS", "SBI", "KOTAK"]
-                },
-                {
-                  method: "netbanking",
-                  banks: ["HDFC", "ICICI", "AXIS", "SBI", "KOTAK"]
-                }
-              ]
-            },
-            upi: {
-              name: "Pay using UPI",
-              instruments: [
-                {
-                  method: "upi"
-                }
-              ]
-            }
-          },
-          sequence: ["block.banks", "block.upi"],
-          preferences: {
-            show_default_blocks: true
-          }
         }
       }
     };
     try {
       const razorpayInstance = new window.Razorpay(options);
-      
-      // Fix for mobile browsers
-      if (isMobile) {
-        // Ensure proper viewport on mobile
-        document.documentElement.style.overflow = 'hidden';
-        document.body.style.overflow = 'hidden';
-        
-        razorpayInstance.on('close', function() {
-          document.documentElement.style.overflow = 'auto';
-          document.body.style.overflow = 'auto';
-        });
-      }
-      
       razorpayInstance.open();
       return true;
     } catch (error) {
@@ -653,12 +593,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         description: 'Failed to initialize payment. Please try again.',
         variant: 'destructive',
       });
-      
-      // Restore scroll on error
-      if (isMobile) {
-        document.documentElement.style.overflow = 'auto';
-        document.body.style.overflow = 'auto';
-      }
       return false;
     }
   };
@@ -704,178 +638,113 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto px-4 sm:px-6">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+          <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
             Secure Checkout
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 sm:space-y-6">
-          <div className="bg-muted p-3 sm:p-4 rounded-lg">
-            <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Order Summary</h3>
-            <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3">
-              <img 
-                src={product.images[0]} 
-                alt={product.name} 
-                className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded" 
-                loading="lazy" 
-              />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm sm:text-base truncate">{product.name}</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Quantity: {quantity}</p>
-                <p className="font-semibold text-sm sm:text-base">₹{product.price.toLocaleString()} each</p>
+        <div className="space-y-6">
+          <div className="bg-muted p-4 rounded-lg">
+            <h3 className="font-semibold mb-3">Order Summary</h3>
+            <div className="flex items-center space-x-3 mb-3">
+              <img src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" loading="lazy" />
+              <div className="flex-1">
+                <p className="font-medium">{product.name}</p>
+                <p className="text-sm text-muted-foreground">Quantity: {quantity}</p>
+                <p className="font-semibold">₹{product.price.toLocaleString()} each</p>
               </div>
             </div>
-            <div className="border-t pt-2 sm:pt-3">
-              <div className="flex justify-between text-xs sm:text-sm mb-1">
+            <div className="border-t pt-3">
+              <div className="flex justify-between text-sm mb-1">
                 <span>Subtotal:</span>
                 <span>₹{(product.price * quantity).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-xs sm:text-sm mb-1">
+              <div className="flex justify-between text-sm mb-1">
                 <span>Shipping:</span>
                 <span className="text-green-600">FREE</span>
               </div>
-              <div className="flex justify-between font-semibold text-base sm:text-lg mt-2 pt-2 border-t">
+              <div className="flex justify-between font-semibold text-lg mt-2 pt-2 border-t">
                 <span>Total Amount:</span>
                 <span>₹{totalAmount.toLocaleString()}</span>
               </div>
             </div>
           </div>
           {affiliateId && (
-            <div className="bg-green-50 p-2 sm:p-3 rounded-lg border border-green-200">
-              <p className="text-xs sm:text-sm font-medium text-green-800">Referral Purchase Detected</p>
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+              <p className="text-sm font-medium text-green-800">Referral Purchase Detected</p>
               <p className="text-xs text-green-700 mt-1">
                 Your referrer will earn 10% commission + ₹100 bonus = ₹{Math.round(totalAmount * 0.10) + 100} on this purchase!
               </p>
             </div>
           )}
           {uid && (
-            <div className="bg-blue-50 p-2 sm:p-3 rounded-lg border border-blue-200">
-              <p className="text-xs sm:text-sm font-medium text-blue-800">Affiliate Purchase</p>
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <p className="text-sm font-medium text-blue-800">Affiliate Purchase</p>
               <p className="text-xs text-blue-700 mt-1">Your upline will earn commissions on this purchase.</p>
             </div>
           )}
-          <div className="bg-blue-50 p-2 sm:p-3 rounded-lg border border-blue-200">
-            <p className="text-xs sm:text-sm font-medium text-blue-800">Your Customer ID</p>
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <p className="text-sm font-medium text-blue-800">Your Customer ID</p>
             <div className="mt-2 flex items-center justify-between bg-white p-2 rounded border">
-              <code className="text-xs text-blue-700 font-mono bg-blue-50 px-2 py-1 rounded truncate flex-1 mr-2">
-                {customerId}
-              </code>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex-shrink-0"
-                onClick={() => navigator.clipboard.writeText(customerId)}
-              >
-                Copy
-              </Button>
+              <code className="text-xs text-blue-700 font-mono bg-blue-50 px-2 py-1 rounded">{customerId}</code>
+              <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(customerId)}>Copy</Button>
             </div>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm">Full Name *</Label>
-              <Input 
-                name="name" 
-                value={formData.name} 
-                onChange={handleInputChange} 
-                required 
-                placeholder="Enter your full name" 
-                className="text-sm sm:text-base"
-              />
+              <Label>Full Name *</Label>
+              <Input name="name" value={formData.name} onChange={handleInputChange} required placeholder="Enter your full name" />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Email *</Label>
-              <Input 
-                name="email" 
-                type="email" 
-                value={formData.email} 
-                onChange={handleInputChange} 
-                required 
-                placeholder="your@email.com" 
-                className="text-sm sm:text-base"
-              />
+              <Label>Email *</Label>
+              <Input name="email" type="email" value={formData.email} onChange={handleInputChange} required placeholder="your@email.com" />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Phone *</Label>
-              <Input 
-                name="phone" 
-                type="tel" 
-                value={formData.phone} 
-                onChange={handleInputChange} 
-                required 
-                placeholder="9876543210" 
-                className="text-sm sm:text-base"
-              />
+              <Label>Phone *</Label>
+              <Input name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required placeholder="9876543210" />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Address *</Label>
-              <Input 
-                name="address" 
-                value={formData.address} 
-                onChange={handleInputChange} 
-                required 
-                placeholder="Street address, building, etc." 
-                className="text-sm sm:text-base"
-              />
+              <Label>Address *</Label>
+              <Input name="address" value={formData.address} onChange={handleInputChange} required placeholder="Street address, building, etc." />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm">City *</Label>
-                <Input 
-                  name="city" 
-                  value={formData.city} 
-                  onChange={handleInputChange} 
-                  required 
-                  placeholder="Your city" 
-                  className="text-sm sm:text-base"
-                />
+                <Label>City *</Label>
+                <Input name="city" value={formData.city} onChange={handleInputChange} required placeholder="Your city" />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">State *</Label>
-                <Input 
-                  name="state" 
-                  value={formData.state} 
-                  onChange={handleInputChange} 
-                  required 
-                  placeholder="Your state" 
-                  className="text-sm sm:text-base"
-                />
+                <Label>State *</Label>
+                <Input name="state" value={formData.state} onChange={handleInputChange} required placeholder="Your state" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">PIN Code *</Label>
-              <Input 
-                name="pincode" 
-                value={formData.pincode} 
-                onChange={handleInputChange} 
-                required 
-                placeholder="6-digit PIN" 
-                className="text-sm sm:text-base"
-              />
+              <Label>PIN Code *</Label>
+              <Input name="pincode" value={formData.pincode} onChange={handleInputChange} required placeholder="6-digit PIN" />
             </div>
            
-            <div className="bg-primary/5 p-3 sm:p-4 rounded-lg border border-primary/20">
+            <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="h-4 w-4 text-primary" />
-                <span className="text-xs sm:text-sm font-medium">Secure Payment by Razorpay</span>
+                <span className="text-sm font-medium">Secure Payment by Razorpay</span>
               </div>
               <p className="text-xs text-muted-foreground">
                 Your payment information is encrypted and secure. We never store your card details.
               </p>
-              <div className="mt-2 flex flex-wrap items-center justify-between text-xs gap-1">
+              <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Payment Methods:</span>
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="bg-white px-2 py-1 rounded border text-xs">Credit Card</span>
-                  <span className="bg-white px-2 py-1 rounded border text-xs">Debit Card</span>
-                  <span className="bg-white px-2 py-1 rounded border text-xs">UPI</span>
-                  <span className="bg-white px-2 py-1 rounded border text-xs">Net Banking</span>
+                <div className="flex items-center gap-1">
+                  <span className="bg-white px-2 py-1 rounded border">Credit Card</span>
+                  <span className="bg-white px-2 py-1 rounded border">Debit Card</span>
+                  <span className="bg-white px-2 py-1 rounded border">UPI</span>
+                  <span className="bg-white px-2 py-1 rounded border">Net Banking</span>
                 </div>
               </div>
             </div>
             <Button
               type="submit"
-              className="w-full gradient-primary text-primary-foreground py-3 text-sm sm:text-base"
+              className="w-full gradient-primary text-primary-foreground py-3"
               disabled={loading || paymentLoading || !razorpayLoaded}
             >
               {paymentLoading ? 'Processing Payment...' :
@@ -884,7 +753,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                `Pay Securely ₹${totalAmount.toLocaleString()}`}
             </Button>
           </form>
-          <div className="text-center text-xs text-gray-500 px-2">
+          <div className="text-center text-xs text-gray-500">
             By completing your purchase, you agree to our Terms of Service and Privacy Policy.
           </div>
         </div>
@@ -893,7 +762,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   );
 }
 
-// Image Zoom Modal - RESPONSIVE FIXES
+// Image Zoom Modal
 interface ImageZoomModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -915,15 +784,15 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 sm:p-2 md:p-4 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] xl:w-[60vw]">
-        <div className="relative flex items-center justify-center h-[60vh] sm:h-[70vh] md:h-[75vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-4">
+        <div className="relative flex items-center justify-center h-[70vh]">
           <Button
             variant="ghost"
             size="sm"
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background z-10"
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
             onClick={prev}
           >
-            <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+            <ChevronLeft className="h-8 w-8" />
           </Button>
           <img
             src={currentImage}
@@ -937,26 +806,26 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
           <Button
             variant="ghost"
             size="sm"
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background z-10"
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background"
             onClick={next}
           >
-            <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
+            <ChevronRight className="h-8 w-8" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-background/80 hover:bg-background z-10"
+            className="absolute top-4 right-4 bg-background/80 hover:bg-background"
             onClick={onClose}
           >
-            <X className="h-5 w-5 sm:h-6 sm:w-6" />
+            <X className="h-6 w-6" />
           </Button>
           {images.length > 1 && (
-            <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1 sm:gap-2 z-10">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
               {images.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentIndex(i)}
-                  className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors ${
+                  className={`w-2 h-2 rounded-full transition-colors ${
                     i === currentIndex ? 'bg-primary' : 'bg-muted-foreground/50'
                   }`}
                 />
@@ -999,6 +868,9 @@ export default function ProductDetail() {
       try {
         const res = await axios.get(`/api/products/${productId}`);
         if (res.data) {
+          // ✅ Fix: Use URLs directly—no prepending!
+          // Assume upload returns relative paths like '/uploads/filename.jpg' or full URLs.
+          // Next.js serves relative paths from /public automatically.
           const mainImage = res.data.image || null;
           const additionalImages = res.data.images ? 
             (Array.isArray(res.data.images) ? res.data.images : res.data.images.split(',').map((s: string) => s.trim()).filter(Boolean)) : 
@@ -1011,6 +883,7 @@ export default function ProductDetail() {
             affiliateId
           });
 
+          // Same fix for related products
           const relatedRes = await axios.get(`/api/products?category=${res.data.category}`);
           setRelatedProducts(relatedRes.data.filter((p: any) => p._id !== res.data._id).slice(0, 4).map((p: any) => {
             const pMainImage = p.image || null;
@@ -1060,22 +933,13 @@ export default function ProductDetail() {
     setIsZoomOpen(true);
   };
 
-  if (loading) return (
-    <div className="py-20 bg-white min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-lg text-gray-600">Loading product...</p>
-      </div>
-    </div>
-  );
-  
+  if (loading) return <div className="py-20 text-center text-xl">Loading product...</div>;
   if (error || !product) return (
-    <div className="py-20 bg-white min-h-screen flex items-center justify-center px-4">
-      <div className="text-center max-w-md">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-4">Product Not Found</h1>
-        <p className="text-gray-600 mb-6">The product you're looking for doesn't exist or has been removed.</p>
+    <div className="py-20 bg-white min-h-screen flex items-center justify-center text-center">
+      <div>
+        <h1 className="text-3xl font-bold mb-4">Product Not Found</h1>
         <Link href="/products">
-          <Button className="gradient-primary text-primary-foreground px-6">
+          <Button className="gradient-primary text-primary-foreground">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
           </Button>
         </Link>
@@ -1084,60 +948,47 @@ export default function ProductDetail() {
   );
 
   return (
-    <div className="py-8 sm:py-12 md:py-20 bg-white min-h-screen">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center flex-wrap space-x-1 sm:space-x-2 text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8 px-2 sm:px-0">
-          <Link href="/" className="hover:text-primary transition-colors">Home</Link>
-          <span>/</span>
-          <Link href="/products" className="hover:text-primary transition-colors">Products</Link>
-          <span>/</span>
-          <span className="capitalize text-foreground truncate max-w-[100px] sm:max-w-[150px] md:max-w-none">
-            {product.category}
-          </span>
-          <span>/</span>
-          <span className="text-foreground font-medium truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
-            {product.name}
-          </span>
+    <div className="py-20 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-8">
+          <Link href="/">Home</Link> <span>/</span>
+          <Link href="/products">Products</Link> <span>/</span>
+          <span className="capitalize">{product.category}</span> <span>/</span>
+          <span className="text-foreground">{product.name}</span>
         </nav>
-        
-        {/* Product Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-start mb-12 sm:mb-16 px-2 sm:px-0">
-          {/* Product Images */}
-          <div className="space-y-3 sm:space-y-4">
-            <div className="relative overflow-hidden rounded-xl sm:rounded-2xl shadow-lg">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
+          <div className="space-y-4">
+            <div className="relative overflow-hidden rounded-xl shadow-lg">
               <img
                 src={product.images[selectedImageIndex] || FALLBACK_IMAGE}
                 alt={product.name}
-                className="w-full h-64 sm:h-72 md:h-80 lg:h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"
+                className="w-full h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"
                 onClick={() => handleImageClick(selectedImageIndex)}
                 loading="eager"
                 onError={(e) => {
-                  console.warn(`Failed to load image: ${e.currentTarget.src}`);
+                  console.warn(`Failed to load image: ${e.currentTarget.src}`); // Debug log
                   e.currentTarget.src = FALLBACK_IMAGE;
                 }}
               />
               {product.discount && (
-                <Badge variant="destructive" className="absolute top-2 sm:top-3 md:top-4 left-2 sm:left-3 md:left-4 text-xs sm:text-sm md:text-lg px-2 sm:px-3 py-0.5 sm:py-1 z-10">
+                <Badge variant="destructive" className="absolute top-4 left-4 text-lg px-3 py-1 z-10">
                   {product.discount}% OFF
                 </Badge>
               )}
               {!isInStock && (
-                <Badge variant="secondary" className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 text-xs sm:text-sm md:text-lg px-2 sm:px-3 py-0.5 sm:py-1 z-10">
+                <Badge variant="secondary" className="absolute top-4 right-4 text-lg px-3 py-1 z-10">
                   Out of Stock
                 </Badge>
               )}
             </div>
             {product.images.length > 1 && (
-              <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {product.images.map((img: string, i: number) => (
                   <img
                     key={i}
                     src={img || FALLBACK_IMAGE}
                     alt={`Thumbnail ${i + 1}`}
-                    className={`rounded-lg cursor-pointer h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0 object-cover transition-transform duration-200 hover:scale-105 ${
-                      selectedImageIndex === i ? 'ring-2 ring-primary ring-offset-1 sm:ring-offset-2' : ''
-                    }`}
+                    className={`rounded-lg cursor-pointer h-20 w-20 flex-shrink-0 object-cover transition-transform duration-200 hover:scale-105 ${selectedImageIndex === i ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                     onClick={() => setSelectedImageIndex(i)}
                     loading="lazy"
                     onError={(e) => {
@@ -1149,68 +1000,51 @@ export default function ProductDetail() {
               </div>
             )}
           </div>
-          
-          {/* Product Details */}
-          <div className="space-y-4 sm:space-y-6 md:space-y-8 px-2 sm:px-0">
+          <div className="space-y-8">
             <div>
-              <Badge variant="outline" className="mb-3 sm:mb-4 capitalize text-xs sm:text-sm">
-                {product.category}
-              </Badge>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4">{product.name}</h1>
-              <div className="flex flex-wrap items-center space-x-2 sm:space-x-4 mb-3 sm:mb-4">
-                <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary">
-                  ₹{product.price.toLocaleString()}
-                </span>
+              <Badge variant="outline" className="mb-4 capitalize">{product.category}</Badge>
+              <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
+              <div className="flex items-center space-x-4 mb-4">
+                <span className="text-4xl font-bold text-primary">₹{product.price.toLocaleString()}</span>
                 {product.originalPrice && (
                   <>
-                    <span className="text-lg sm:text-xl text-muted-foreground line-through">
-                      ₹{product.originalPrice.toLocaleString()}
-                    </span>
-                    <Badge variant="destructive" className="text-xs sm:text-sm">
-                      Save ₹{(product.originalPrice - product.price).toLocaleString()}
-                    </Badge>
+                    <span className="text-xl text-muted-foreground line-through">₹{product.originalPrice.toLocaleString()}</span>
+                    <Badge variant="destructive">Save ₹{(product.originalPrice - product.price).toLocaleString()}</Badge>
                   </>
                 )}
               </div>
-              <div className="flex flex-wrap items-center space-x-2 mb-4 sm:mb-6">
+              <div className="flex items-center space-x-2 mb-6">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
-                      className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                        i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'
-                      }`}
+                      className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`}
                     />
                   ))}
                 </div>
-                <span className="text-xs sm:text-sm text-muted-foreground">
+                <span className="text-muted-foreground">
                   ({(product.rating || 0).toFixed(1)} from {product.reviews || 0} reviews)
                 </span>
               </div>
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg mb-4 sm:mb-6">
-                {product.description}
-              </p>
+              <p className="text-muted-foreground text-lg mb-6">{product.description}</p>
             </div>
-            
-            {/* Quantity and Actions */}
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                <label className="text-sm sm:text-base font-medium">Quantity:</label>
-                <div className="flex items-center border rounded-lg w-fit">
+            <div className="space-y-6">
+              <div className="flex items-center space-x-4">
+                <label className="text-sm font-medium">Quantity:</label>
+                <div className="flex items-center border rounded-lg">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)}
                     disabled={!isInStock}
-                    className="h-8 w-8 sm:h-9 sm:w-9"
                   >
-                    <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Minus className="h-4 w-4" />
                   </Button>
                   <Input
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-12 sm:w-16 text-center border-0 text-sm sm:text-base"
+                    className="w-16 text-center border-0"
                     disabled={!isInStock}
                   />
                   <Button
@@ -1218,82 +1052,77 @@ export default function ProductDetail() {
                     size="sm"
                     onClick={() => setQuantity(q => q + 1)}
                     disabled={!isInStock}
-                    className="h-8 w-8 sm:h-9 sm:w-9"
                   >
-                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   onClick={handleAddToCart}
-                  className="flex-1 gradient-primary text-primary-foreground py-2.5 sm:py-3 text-sm sm:text-base"
+                  className="flex-1 gradient-primary text-primary-foreground py-3"
                   size="lg"
                   disabled={!isInStock}
                 >
-                  <ShoppingCart className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Add to Cart
+                  <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
                 </Button>
                 <Button
                   onClick={handleBuyNow}
-                  className="flex-1 gradient-gold text-accent-foreground py-2.5 sm:py-3 text-sm sm:text-base"
+                  className="flex-1 gradient-gold text-accent-foreground py-3"
                   size="lg"
                   disabled={!isInStock}
                 >
-                  <Zap className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Buy Now
+                  <Zap className="mr-2 h-5 w-5" /> Buy Now
                 </Button>
               </div>
               {!isInStock && (
-                <Badge variant="secondary" className="w-full py-2.5 sm:py-3 justify-center text-sm sm:text-base">
+                <Badge variant="secondary" className="w-full py-3 justify-center">
                   Out of Stock - Notify Me When Available
                 </Badge>
               )}
             </div>
-            
-            {/* Features Grid */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-4 sm:pt-6 border-t">
+            <div className="grid grid-cols-3 gap-4 pt-6 border-t">
               <div className="text-center">
-                <Truck className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-1 sm:mb-2" />
-                <p className="text-xs sm:text-sm text-muted-foreground">Free Shipping</p>
+                <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Free Shipping</p>
               </div>
-             
+            
               <div className="text-center">
-                <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-1 sm:mb-2" />
-                <p className="text-xs sm:text-sm text-muted-foreground">Secure Payment</p>
+                <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Secure Payment</p>
               </div>
             </div>
           </div>
         </div>
-        
-        {/* Product Tabs */}
-        <Tabs defaultValue="features" className="mb-12 sm:mb-16 px-2 sm:px-0">
+        <Tabs defaultValue="features" className="mb-16">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="features" className="text-xs sm:text-sm">Features</TabsTrigger>
-            <TabsTrigger value="specifications" className="text-xs sm:text-sm">Specifications</TabsTrigger>
-            <TabsTrigger value="reviews" className="text-xs sm:text-sm">Reviews</TabsTrigger>
+            <TabsTrigger value="features">Features</TabsTrigger>
+            <TabsTrigger value="specifications">Specifications</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
-          <TabsContent value="features" className="mt-4 sm:mt-8">
-            <div className="bg-muted rounded-lg p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Product Features</h3>
-              <ul className="space-y-2 sm:space-y-3">
+          <TabsContent value="features" className="mt-8">
+            <div className="bg-muted rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">Product Features</h3>
+              <ul className="space-y-3">
                 {product.features?.length > 0 ? product.features.map((f: string, i: number) => (
-                  <li key={i} className="flex items-start space-x-2 sm:space-x-3">
-                    <Check className="h-4 w-4 sm:h-5 sm:w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <span className="text-sm sm:text-base">{f}</span>
+                  <li key={i} className="flex items-center space-x-3">
+                    <Check className="h-5 w-5 text-primary" />
+                    <span>{f}</span>
                   </li>
-                )) : <li className="text-muted-foreground text-sm sm:text-base">No features available</li>}
+                )) : <li className="text-muted-foreground">No features available</li>}
               </ul>
             </div>
           </TabsContent>
-          <TabsContent value="specifications" className="mt-4 sm:mt-8">
-            <div className="bg-muted rounded-lg p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Specifications</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 text-sm sm:text-base">
-                <div className="space-y-2">
+          <TabsContent value="specifications" className="mt-8">
+            <div className="bg-muted rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">Specifications</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
                   <p><strong>Category:</strong> {product.category}</p>
                   <p><strong>Material:</strong> Swiss Premium Alloy</p>
                   <p><strong>Finish:</strong> 24K Gold Plated</p>
                 </div>
-                <div className="space-y-2">
+                <div>
                   <p><strong>Weight:</strong> Lightweight</p>
                   <p><strong>Care:</strong> Clean with soft cloth</p>
                   <p><strong>Warranty:</strong> Lifetime</p>
@@ -1301,53 +1130,41 @@ export default function ProductDetail() {
               </div>
             </div>
           </TabsContent>
-          <TabsContent value="reviews" className="mt-4 sm:mt-8">
-            <div className="bg-muted rounded-lg p-4 sm:p-6 text-center py-6 sm:py-8">
-              <div className="text-3xl sm:text-4xl mb-2">{(product.rating || 0).toFixed(1)}</div>
+          <TabsContent value="reviews" className="mt-8">
+            <div className="bg-muted rounded-lg p-6 text-center py-8">
+              <div className="text-4xl mb-2">{(product.rating || 0).toFixed(1)}</div>
               <div className="flex justify-center mb-2">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
-                    className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                      i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'
-                    }`}
+                    className={`h-5 w-5 ${i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'}`}
                   />
                 ))}
               </div>
-              <p className="text-muted-foreground text-sm sm:text-base">
-                Based on {product.reviews || 0} reviews
-              </p>
+              <p className="text-muted-foreground">Based on {product.reviews || 0} reviews</p>
             </div>
           </TabsContent>
         </Tabs>
-        
-        {/* Related Products */}
         {relatedProducts.length > 0 && (
-          <div className="mb-12 sm:mb-16 px-2 sm:px-0">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 sm:mb-8">Related Products</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold mb-8">Related Products</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {relatedProducts.map(p => (
                 <ProductCard key={p._id} product={p} />
               ))}
             </div>
           </div>
         )}
-        
-        {/* CTA Banner */}
-        <div className="bg-gradient-to-r from-primary to-yellow-700 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-white text-center mt-12 sm:mt-16 mx-2 sm:mx-0">
-          <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4">Interested in Earning?</h3>
-          <p className="mb-4 sm:mb-6 max-w-2xl mx-auto text-sm sm:text-base">
-            Join our affiliate program and earn commissions on every sale!
-          </p>
+        <div className="bg-gradient-to-r from-primary to-yellow-700 rounded-2xl p-8 text-white text-center mt-16">
+          <h3 className="text-2xl font-bold mb-4">Interested in Earning?</h3>
+          <p className="mb-6 max-w-2xl mx-auto">Join our affiliate program and earn commissions on every sale!</p>
           <Link href="/affiliate">
-            <Button variant="outline" className="border-white hover:bg-white text-primary text-sm sm:text-base">
+            <Button variant="outline" className="border-white hover:bg-white text-primary">
               Learn More
             </Button>
           </Link>
         </div>
       </div>
-      
-      {/* Modals */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
