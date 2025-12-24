@@ -423,7 +423,7 @@ const markUserAsPurchased = async (userId: string) => {
   }
 };
 
-// Checkout Modal with Razorpay Integration
+// Checkout Modal with Razorpay Integration - RESPONSIVE FIXES
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -500,7 +500,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     }
   };
 
-  // Initiate Razorpay Payment
+  // Initiate Razorpay Payment with mobile fixes
   const initiateRazorpayPayment = async (orderData: OrderData) => {
     if (!razorpayLoaded) {
       toast({
@@ -518,6 +518,10 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       });
       return false;
     }
+    
+    // Check mobile device
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
     const options = {
       key: RAZORPAY_CONFIG.key_id,
       amount: totalAmount * 100, // Convert to paise
@@ -572,6 +576,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
       theme: {
         color: '#b45309',
       },
+      // MOBILE FIXES
       modal: {
         ondismiss: function() {
           toast({
@@ -579,11 +584,66 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
             description: 'You cancelled the payment process.',
             variant: 'default',
           });
+        },
+        // Prevent modal scaling issues on mobile
+        escape: true,
+        animation: true
+      },
+      // Additional mobile optimizations
+      retry: {
+        enabled: true,
+        max_count: 2
+      },
+      timeout: 300,
+      remember_customer: true,
+      // Fix for mobile viewport
+      config: {
+        display: {
+          blocks: {
+            banks: {
+              name: "Bank Offer",
+              instruments: [
+                {
+                  method: "card",
+                  issuers: ["HDFC", "ICICI", "AXIS", "SBI", "KOTAK"]
+                },
+                {
+                  method: "netbanking",
+                  banks: ["HDFC", "ICICI", "AXIS", "SBI", "KOTAK"]
+                }
+              ]
+            },
+            upi: {
+              name: "Pay using UPI",
+              instruments: [
+                {
+                  method: "upi"
+                }
+              ]
+            }
+          },
+          sequence: ["block.banks", "block.upi"],
+          preferences: {
+            show_default_blocks: true
+          }
         }
       }
     };
     try {
       const razorpayInstance = new window.Razorpay(options);
+      
+      // Fix for mobile browsers
+      if (isMobile) {
+        // Ensure proper viewport on mobile
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+        
+        razorpayInstance.on('close', function() {
+          document.documentElement.style.overflow = 'auto';
+          document.body.style.overflow = 'auto';
+        });
+      }
+      
       razorpayInstance.open();
       return true;
     } catch (error) {
@@ -593,6 +653,12 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         description: 'Failed to initialize payment. Please try again.',
         variant: 'destructive',
       });
+      
+      // Restore scroll on error
+      if (isMobile) {
+        document.documentElement.style.overflow = 'auto';
+        document.body.style.overflow = 'auto';
+      }
       return false;
     }
   };
@@ -638,7 +704,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="sm:max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto px-4 sm:px-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <CreditCard className="h-5 w-5" />
@@ -648,7 +714,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         <div className="space-y-4 sm:space-y-6">
           <div className="bg-muted p-3 sm:p-4 rounded-lg">
             <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Order Summary</h3>
-            <div className="flex items-center space-x-3 mb-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3">
               <img 
                 src={product.images[0]} 
                 alt={product.name} 
@@ -661,7 +727,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                 <p className="font-semibold text-sm sm:text-base">₹{product.price.toLocaleString()} each</p>
               </div>
             </div>
-            <div className="border-t pt-3">
+            <div className="border-t pt-2 sm:pt-3">
               <div className="flex justify-between text-xs sm:text-sm mb-1">
                 <span>Subtotal:</span>
                 <span>₹{(product.price * quantity).toLocaleString()}</span>
@@ -676,7 +742,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               </div>
             </div>
           </div>
-          
           {affiliateId && (
             <div className="bg-green-50 p-2 sm:p-3 rounded-lg border border-green-200">
               <p className="text-xs sm:text-sm font-medium text-green-800">Referral Purchase Detected</p>
@@ -685,14 +750,12 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               </p>
             </div>
           )}
-          
           {uid && (
             <div className="bg-blue-50 p-2 sm:p-3 rounded-lg border border-blue-200">
               <p className="text-xs sm:text-sm font-medium text-blue-800">Affiliate Purchase</p>
               <p className="text-xs text-blue-700 mt-1">Your upline will earn commissions on this purchase.</p>
             </div>
           )}
-          
           <div className="bg-blue-50 p-2 sm:p-3 rounded-lg border border-blue-200">
             <p className="text-xs sm:text-sm font-medium text-blue-800">Your Customer ID</p>
             <div className="mt-2 flex items-center justify-between bg-white p-2 rounded border">
@@ -702,28 +765,26 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => navigator.clipboard.writeText(customerId)}
                 className="flex-shrink-0"
+                onClick={() => navigator.clipboard.writeText(customerId)}
               >
                 Copy
               </Button>
             </div>
           </div>
-          
           <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm">Full Name *</Label>
               <Input 
                 name="name" 
                 value={formData.name} 
                 onChange={handleInputChange} 
                 required 
-                placeholder="Enter your full name"
+                placeholder="Enter your full name" 
                 className="text-sm sm:text-base"
               />
             </div>
-            
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm">Email *</Label>
               <Input 
                 name="email" 
@@ -731,12 +792,11 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                 value={formData.email} 
                 onChange={handleInputChange} 
                 required 
-                placeholder="your@email.com"
+                placeholder="your@email.com" 
                 className="text-sm sm:text-base"
               />
             </div>
-            
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm">Phone *</Label>
               <Input 
                 name="phone" 
@@ -744,56 +804,53 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                 value={formData.phone} 
                 onChange={handleInputChange} 
                 required 
-                placeholder="9876543210"
+                placeholder="9876543210" 
                 className="text-sm sm:text-base"
               />
             </div>
-            
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm">Address *</Label>
               <Input 
                 name="address" 
                 value={formData.address} 
                 onChange={handleInputChange} 
                 required 
-                placeholder="Street address, building, etc."
+                placeholder="Street address, building, etc." 
                 className="text-sm sm:text-base"
               />
             </div>
-            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-1 sm:space-y-2">
+              <div className="space-y-2">
                 <Label className="text-sm">City *</Label>
                 <Input 
                   name="city" 
                   value={formData.city} 
                   onChange={handleInputChange} 
                   required 
-                  placeholder="Your city"
+                  placeholder="Your city" 
                   className="text-sm sm:text-base"
                 />
               </div>
-              <div className="space-y-1 sm:space-y-2">
+              <div className="space-y-2">
                 <Label className="text-sm">State *</Label>
                 <Input 
                   name="state" 
                   value={formData.state} 
                   onChange={handleInputChange} 
                   required 
-                  placeholder="Your state"
+                  placeholder="Your state" 
                   className="text-sm sm:text-base"
                 />
               </div>
             </div>
-            
-            <div className="space-y-1 sm:space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm">PIN Code *</Label>
               <Input 
                 name="pincode" 
                 value={formData.pincode} 
                 onChange={handleInputChange} 
                 required 
-                placeholder="6-digit PIN"
+                placeholder="6-digit PIN" 
                 className="text-sm sm:text-base"
               />
             </div>
@@ -806,9 +863,9 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               <p className="text-xs text-muted-foreground">
                 Your payment information is encrypted and secure. We never store your card details.
               </p>
-              <div className="mt-2 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
+              <div className="mt-2 flex flex-wrap items-center justify-between text-xs gap-1">
                 <span className="text-muted-foreground">Payment Methods:</span>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   <span className="bg-white px-2 py-1 rounded border text-xs">Credit Card</span>
                   <span className="bg-white px-2 py-1 rounded border text-xs">Debit Card</span>
                   <span className="bg-white px-2 py-1 rounded border text-xs">UPI</span>
@@ -816,7 +873,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                 </div>
               </div>
             </div>
-            
             <Button
               type="submit"
               className="w-full gradient-primary text-primary-foreground py-3 text-sm sm:text-base"
@@ -828,8 +884,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                `Pay Securely ₹${totalAmount.toLocaleString()}`}
             </Button>
           </form>
-          
-          <div className="text-center text-xs text-gray-500">
+          <div className="text-center text-xs text-gray-500 px-2">
             By completing your purchase, you agree to our Terms of Service and Privacy Policy.
           </div>
         </div>
@@ -838,7 +893,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   );
 }
 
-// Image Zoom Modal
+// Image Zoom Modal - RESPONSIVE FIXES
 interface ImageZoomModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -860,8 +915,8 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 sm:p-4">
-        <div className="relative flex items-center justify-center h-[70vh] sm:h-[80vh]">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 sm:p-2 md:p-4 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] xl:w-[60vw]">
+        <div className="relative flex items-center justify-center h-[60vh] sm:h-[70vh] md:h-[75vh]">
           <Button
             variant="ghost"
             size="sm"
@@ -870,17 +925,15 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
           >
             <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
           </Button>
-          
           <img
             src={currentImage}
             alt={`Zoomed image ${currentIndex + 1}`}
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain rounded-lg"
             loading="lazy"
             onError={(e) => {
               e.currentTarget.src = FALLBACK_IMAGE;
             }}
           />
-          
           <Button
             variant="ghost"
             size="sm"
@@ -889,7 +942,6 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
           >
             <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
           </Button>
-          
           <Button
             variant="ghost"
             size="sm"
@@ -898,17 +950,15 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
           >
             <X className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
-          
           {images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1 sm:gap-2 z-10">
               {images.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentIndex(i)}
-                  className={`w-2 h-2 rounded-full transition-colors ${
+                  className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors ${
                     i === currentIndex ? 'bg-primary' : 'bg-muted-foreground/50'
                   }`}
-                  aria-label={`Go to image ${i + 1}`}
                 />
               ))}
             </div>
@@ -949,9 +999,6 @@ export default function ProductDetail() {
       try {
         const res = await axios.get(`/api/products/${productId}`);
         if (res.data) {
-          // ✅ Fix: Use URLs directly—no prepending!
-          // Assume upload returns relative paths like '/uploads/filename.jpg' or full URLs.
-          // Next.js serves relative paths from /public automatically.
           const mainImage = res.data.image || null;
           const additionalImages = res.data.images ? 
             (Array.isArray(res.data.images) ? res.data.images : res.data.images.split(',').map((s: string) => s.trim()).filter(Boolean)) : 
@@ -964,7 +1011,6 @@ export default function ProductDetail() {
             affiliateId
           });
 
-          // Same fix for related products
           const relatedRes = await axios.get(`/api/products?category=${res.data.category}`);
           setRelatedProducts(relatedRes.data.filter((p: any) => p._id !== res.data._id).slice(0, 4).map((p: any) => {
             const pMainImage = p.image || null;
@@ -1015,17 +1061,21 @@ export default function ProductDetail() {
   };
 
   if (loading) return (
-    <div className="py-20 px-4 sm:px-6 text-center text-xl">
-      Loading product...
+    <div className="py-20 bg-white min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-lg text-gray-600">Loading product...</p>
+      </div>
     </div>
   );
   
   if (error || !product) return (
-    <div className="py-20 bg-white min-h-screen flex items-center justify-center text-center px-4">
-      <div>
+    <div className="py-20 bg-white min-h-screen flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
         <h1 className="text-2xl sm:text-3xl font-bold mb-4">Product Not Found</h1>
+        <p className="text-gray-600 mb-6">The product you're looking for doesn't exist or has been removed.</p>
         <Link href="/products">
-          <Button className="gradient-primary text-primary-foreground text-sm sm:text-base">
+          <Button className="gradient-primary text-primary-foreground px-6">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
           </Button>
         </Link>
@@ -1034,28 +1084,32 @@ export default function ProductDetail() {
   );
 
   return (
-    <div className="py-6 sm:py-12 md:py-20 bg-white">
+    <div className="py-8 sm:py-12 md:py-20 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Breadcrumb Navigation */}
-        <nav className="flex items-center space-x-2 text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 md:mb-8 px-2 sm:px-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
-          <Link href="/" className="hover:text-primary">Home</Link> 
+        <nav className="flex items-center flex-wrap space-x-1 sm:space-x-2 text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8 px-2 sm:px-0">
+          <Link href="/" className="hover:text-primary transition-colors">Home</Link>
           <span>/</span>
-          <Link href="/products" className="hover:text-primary">Products</Link> 
+          <Link href="/products" className="hover:text-primary transition-colors">Products</Link>
           <span>/</span>
-          <span className="capitalize truncate">{product.category}</span> 
+          <span className="capitalize text-foreground truncate max-w-[100px] sm:max-w-[150px] md:max-w-none">
+            {product.category}
+          </span>
           <span>/</span>
-          <span className="text-foreground font-medium truncate max-w-[120px] sm:max-w-none">{product.name}</span>
+          <span className="text-foreground font-medium truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
+            {product.name}
+          </span>
         </nav>
         
-        {/* Product Grid */}
+        {/* Product Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-start mb-12 sm:mb-16 px-2 sm:px-0">
           {/* Product Images */}
           <div className="space-y-3 sm:space-y-4">
-            <div className="relative overflow-hidden rounded-lg sm:rounded-xl shadow-lg">
+            <div className="relative overflow-hidden rounded-xl sm:rounded-2xl shadow-lg">
               <img
                 src={product.images[selectedImageIndex] || FALLBACK_IMAGE}
                 alt={product.name}
-                className="w-full h-64 sm:h-80 md:h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"
+                className="w-full h-64 sm:h-72 md:h-80 lg:h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"
                 onClick={() => handleImageClick(selectedImageIndex)}
                 loading="eager"
                 onError={(e) => {
@@ -1064,25 +1118,24 @@ export default function ProductDetail() {
                 }}
               />
               {product.discount && (
-                <Badge variant="destructive" className="absolute top-2 sm:top-3 md:top-4 left-2 sm:left-3 md:left-4 text-xs sm:text-sm md:text-lg px-2 sm:px-3 py-1 z-10">
+                <Badge variant="destructive" className="absolute top-2 sm:top-3 md:top-4 left-2 sm:left-3 md:left-4 text-xs sm:text-sm md:text-lg px-2 sm:px-3 py-0.5 sm:py-1 z-10">
                   {product.discount}% OFF
                 </Badge>
               )}
               {!isInStock && (
-                <Badge variant="secondary" className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 text-xs sm:text-sm md:text-lg px-2 sm:px-3 py-1 z-10">
+                <Badge variant="secondary" className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 text-xs sm:text-sm md:text-lg px-2 sm:px-3 py-0.5 sm:py-1 z-10">
                   Out of Stock
                 </Badge>
               )}
             </div>
-            
             {product.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-hide">
+              <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-hide">
                 {product.images.map((img: string, i: number) => (
                   <img
                     key={i}
                     src={img || FALLBACK_IMAGE}
                     alt={`Thumbnail ${i + 1}`}
-                    className={`rounded cursor-pointer h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0 object-cover transition-transform duration-200 hover:scale-105 ${
+                    className={`rounded-lg cursor-pointer h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 flex-shrink-0 object-cover transition-transform duration-200 hover:scale-105 ${
                       selectedImageIndex === i ? 'ring-2 ring-primary ring-offset-1 sm:ring-offset-2' : ''
                     }`}
                     onClick={() => setSelectedImageIndex(i)}
@@ -1103,12 +1156,8 @@ export default function ProductDetail() {
               <Badge variant="outline" className="mb-3 sm:mb-4 capitalize text-xs sm:text-sm">
                 {product.category}
               </Badge>
-              
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4 leading-tight">
-                {product.name}
-              </h1>
-              
-              <div className="flex items-center space-x-3 sm:space-x-4 mb-3 sm:mb-4 flex-wrap">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4">{product.name}</h1>
+              <div className="flex flex-wrap items-center space-x-2 sm:space-x-4 mb-3 sm:mb-4">
                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary">
                   ₹{product.price.toLocaleString()}
                 </span>
@@ -1123,16 +1172,13 @@ export default function ProductDetail() {
                   </>
                 )}
               </div>
-              
-              <div className="flex items-center space-x-2 mb-4 sm:mb-6 flex-wrap">
+              <div className="flex flex-wrap items-center space-x-2 mb-4 sm:mb-6">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
                       className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                        i < Math.floor(product.rating || 0) 
-                          ? 'fill-current text-accent' 
-                          : 'text-gray-300'
+                        i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'
                       }`}
                     />
                   ))}
@@ -1141,23 +1187,22 @@ export default function ProductDetail() {
                   ({(product.rating || 0).toFixed(1)} from {product.reviews || 0} reviews)
                 </span>
               </div>
-              
-              <p className="text-muted-foreground text-sm sm:text-base md:text-lg mb-4 sm:mb-6 leading-relaxed">
+              <p className="text-muted-foreground text-sm sm:text-base md:text-lg mb-4 sm:mb-6">
                 {product.description}
               </p>
             </div>
             
-            {/* Quantity and Action Buttons */}
+            {/* Quantity and Actions */}
             <div className="space-y-4 sm:space-y-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <label className="text-sm font-medium whitespace-nowrap">Quantity:</label>
-                <div className="flex items-center border rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <label className="text-sm sm:text-base font-medium">Quantity:</label>
+                <div className="flex items-center border rounded-lg w-fit">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)}
                     disabled={!isInStock}
-                    className="h-9 w-9 sm:h-10 sm:w-10"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
                   >
                     <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
@@ -1173,36 +1218,32 @@ export default function ProductDetail() {
                     size="sm"
                     onClick={() => setQuantity(q => q + 1)}
                     disabled={!isInStock}
-                    className="h-9 w-9 sm:h-10 sm:w-10"
+                    className="h-8 w-8 sm:h-9 sm:w-9"
                   >
                     <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   onClick={handleAddToCart}
-                  className="flex-1 gradient-primary text-primary-foreground py-2 sm:py-3 text-sm sm:text-base"
+                  className="flex-1 gradient-primary text-primary-foreground py-2.5 sm:py-3 text-sm sm:text-base"
                   size="lg"
                   disabled={!isInStock}
                 >
-                  <ShoppingCart className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> 
-                  <span className="truncate">Add to Cart</span>
+                  <ShoppingCart className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Add to Cart
                 </Button>
                 <Button
                   onClick={handleBuyNow}
-                  className="flex-1 gradient-gold text-accent-foreground py-2 sm:py-3 text-sm sm:text-base"
+                  className="flex-1 gradient-gold text-accent-foreground py-2.5 sm:py-3 text-sm sm:text-base"
                   size="lg"
                   disabled={!isInStock}
                 >
-                  <Zap className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> 
-                  <span className="truncate">Buy Now</span>
+                  <Zap className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Buy Now
                 </Button>
               </div>
-              
               {!isInStock && (
-                <Badge variant="secondary" className="w-full py-3 justify-center text-sm">
+                <Badge variant="secondary" className="w-full py-2.5 sm:py-3 justify-center text-sm sm:text-base">
                   Out of Stock - Notify Me When Available
                 </Badge>
               )}
@@ -1214,12 +1255,10 @@ export default function ProductDetail() {
                 <Truck className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-1 sm:mb-2" />
                 <p className="text-xs sm:text-sm text-muted-foreground">Free Shipping</p>
               </div>
-              
               <div className="text-center">
                 <RotateCcw className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-1 sm:mb-2" />
                 <p className="text-xs sm:text-sm text-muted-foreground">Easy Returns</p>
               </div>
-              
               <div className="text-center">
                 <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-1 sm:mb-2" />
                 <p className="text-xs sm:text-sm text-muted-foreground">Secure Payment</p>
@@ -1228,42 +1267,30 @@ export default function ProductDetail() {
           </div>
         </div>
         
-        {/* Tabs Section */}
+        {/* Product Tabs */}
         <Tabs defaultValue="features" className="mb-12 sm:mb-16 px-2 sm:px-0">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="features" className="text-xs sm:text-sm">
-              Features
-            </TabsTrigger>
-            <TabsTrigger value="specifications" className="text-xs sm:text-sm">
-              Specifications
-            </TabsTrigger>
-            <TabsTrigger value="reviews" className="text-xs sm:text-sm">
-              Reviews
-            </TabsTrigger>
+            <TabsTrigger value="features" className="text-xs sm:text-sm">Features</TabsTrigger>
+            <TabsTrigger value="specifications" className="text-xs sm:text-sm">Specifications</TabsTrigger>
+            <TabsTrigger value="reviews" className="text-xs sm:text-sm">Reviews</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="features" className="mt-4 sm:mt-6 md:mt-8">
+          <TabsContent value="features" className="mt-4 sm:mt-8">
             <div className="bg-muted rounded-lg p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Product Features</h3>
               <ul className="space-y-2 sm:space-y-3">
                 {product.features?.length > 0 ? product.features.map((f: string, i: number) => (
-                  <li key={i} className="flex items-start space-x-3">
-                    <Check className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <li key={i} className="flex items-start space-x-2 sm:space-x-3">
+                    <Check className="h-4 w-4 sm:h-5 sm:w-5 text-primary mt-0.5 flex-shrink-0" />
                     <span className="text-sm sm:text-base">{f}</span>
                   </li>
-                )) : (
-                  <li className="text-muted-foreground text-sm sm:text-base">
-                    No features available
-                  </li>
-                )}
+                )) : <li className="text-muted-foreground text-sm sm:text-base">No features available</li>}
               </ul>
             </div>
           </TabsContent>
-          
-          <TabsContent value="specifications" className="mt-4 sm:mt-6 md:mt-8">
+          <TabsContent value="specifications" className="mt-4 sm:mt-8">
             <div className="bg-muted rounded-lg p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Specifications</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 text-sm sm:text-base">
                 <div className="space-y-2">
                   <p><strong>Category:</strong> {product.category}</p>
                   <p><strong>Material:</strong> Swiss Premium Alloy</p>
@@ -1277,8 +1304,7 @@ export default function ProductDetail() {
               </div>
             </div>
           </TabsContent>
-          
-          <TabsContent value="reviews" className="mt-4 sm:mt-6 md:mt-8">
+          <TabsContent value="reviews" className="mt-4 sm:mt-8">
             <div className="bg-muted rounded-lg p-4 sm:p-6 text-center py-6 sm:py-8">
               <div className="text-3xl sm:text-4xl mb-2">{(product.rating || 0).toFixed(1)}</div>
               <div className="flex justify-center mb-2">
@@ -1286,9 +1312,7 @@ export default function ProductDetail() {
                   <Star
                     key={i}
                     className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                      i < Math.floor(product.rating || 0) 
-                        ? 'fill-current text-accent' 
-                        : 'text-gray-300'
+                      i < Math.floor(product.rating || 0) ? 'fill-current text-accent' : 'text-gray-300'
                     }`}
                   />
                 ))}
@@ -1304,7 +1328,7 @@ export default function ProductDetail() {
         {relatedProducts.length > 0 && (
           <div className="mb-12 sm:mb-16 px-2 sm:px-0">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 sm:mb-8">Related Products</h2>
-            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               {relatedProducts.map(p => (
                 <ProductCard key={p._id} product={p} />
               ))}
@@ -1312,19 +1336,14 @@ export default function ProductDetail() {
           </div>
         )}
         
-        {/* Affiliate CTA */}
-        <div className="bg-gradient-to-r from-primary to-yellow-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 text-white text-center mt-12 sm:mt-16 mx-2 sm:mx-0">
-          <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4">
-            Interested in Earning?
-          </h3>
+        {/* CTA Banner */}
+        <div className="bg-gradient-to-r from-primary to-yellow-700 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-white text-center mt-12 sm:mt-16 mx-2 sm:mx-0">
+          <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4">Interested in Earning?</h3>
           <p className="mb-4 sm:mb-6 max-w-2xl mx-auto text-sm sm:text-base">
             Join our affiliate program and earn commissions on every sale!
           </p>
           <Link href="/affiliate">
-            <Button 
-              variant="outline" 
-              className="border-white hover:bg-white text-primary text-sm sm:text-base"
-            >
+            <Button variant="outline" className="border-white hover:bg-white text-primary text-sm sm:text-base">
               Learn More
             </Button>
           </Link>
@@ -1341,7 +1360,6 @@ export default function ProductDetail() {
         customerId={customerId}
         uid={uid}
       />
-      
       <ImageZoomModal
         isOpen={isZoomOpen}
         onClose={() => setIsZoomOpen(false)}
