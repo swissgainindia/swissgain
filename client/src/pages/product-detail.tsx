@@ -1086,10 +1086,7 @@ export default function ProductDetail() {
                 <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Free Shipping</p>
               </div>
-              <div className="text-center">
-                <RotateCcw className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">30-Day Returns</p>
-              </div>
+             
               <div className="text-center">
                 <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Secure Payment</p>
