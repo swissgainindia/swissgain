@@ -935,6 +935,7 @@ export default function AdminReferralDashboard() {
                   <Button
                     variant="outline"
                     onClick={() => setTreeViewMode(treeViewMode === 'tree' ? 'radial' : 'tree')}
+                    className='hidden'
                   >
                     {treeViewMode === 'tree' ? (
                       <>

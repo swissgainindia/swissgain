@@ -30,6 +30,8 @@ import { useAuth, findUserByCredentials } from './../lib/auth';
 // Firebase
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, get, push } from 'firebase/database';
+import { X } from 'lucide-react';
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -296,7 +298,7 @@ export default function Affiliate() {
         color: '#b45309',
       },
       modal: {
-        ondismiss: function() {
+        ondismiss: function () {
           toast({
             title: 'Payment Cancelled',
             description: 'You cancelled the payment process.',
@@ -625,27 +627,56 @@ export default function Affiliate() {
         {showPayment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <Card className="w-full max-w-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Complete Registration
-                </CardTitle>
-                <CardDescription>Join the affiliate program with secure payment</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+             <CardHeader className="relative">
+  {/* Close Button */}
+  <button
+    onClick={() => setShowPayment(false)}
+    className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition"
+    aria-label="Close"
+  >
+    <X className="h-5 w-5" />
+  </button>
+
+  <CardTitle className="flex items-center gap-2">
+    <CreditCard className="h-5 w-5" />
+    Complete Registration
+  </CardTitle>
+
+  <CardDescription>
+    Join the affiliate program with secure payment
+  </CardDescription>
+</CardHeader>
+
+             <CardContent className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
                 <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="reg-name">Full Name *</Label>
-                    <Input
-                      id="reg-name"
-                      name="name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={userDetails.name}
-                      onChange={handleInputChange}
-                      required
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="reg-name">Full Name *</Label>
+                      <Input
+                        id="reg-name"
+                        name="name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={userDetails.name}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="reg-phone">Phone Number *</Label>
+                      <Input
+                        id="reg-phone"
+                        name="phone"
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={userDetails.phone}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <Label htmlFor="reg-email">Email Address *</Label>
                     <Input
@@ -654,18 +685,6 @@ export default function Affiliate() {
                       type="email"
                       placeholder="Enter your email"
                       value={userDetails.email}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="reg-phone">Phone Number *</Label>
-                    <Input
-                      id="reg-phone"
-                      name="phone"
-                      type="tel"
-                      placeholder="Enter your phone number"
-                      value={userDetails.phone}
                       onChange={handleInputChange}
                       required
                     />
@@ -685,8 +704,8 @@ export default function Affiliate() {
                         referralCodeValid === false
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500"
                           : referralCodeValid === true
-                          ? "border-green-500 focus:border-green-500 focus:ring-green-500"
-                          : ""
+                            ? "border-green-500 focus:border-green-500 focus:ring-green-500"
+                            : ""
                       }
                     />
                     {referralCode && (
@@ -707,30 +726,34 @@ export default function Affiliate() {
                       </div>
                     )}
                   </div>
-                  <div>
-                    <Label htmlFor="reg-username">Username *</Label>
-                    <Input
-                      id="reg-username"
-                      name="username"
-                      type="text"
-                      placeholder="Choose a unique username"
-                      value={userDetails.username}
-                      onChange={handleInputChange}
-                      required
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="reg-username">Username *</Label>
+                      <Input
+                        id="reg-username"
+                        name="username"
+                        type="text"
+                        placeholder="Choose a unique username"
+                        value={userDetails.username}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="reg-password">Password *</Label>
+                      <Input
+                        id="reg-password"
+                        name="password"
+                        type="password"
+                        placeholder="Create a password"
+                        value={userDetails.password}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="reg-password">Password *</Label>
-                    <Input
-                      id="reg-password"
-                      name="password"
-                      type="password"
-                      placeholder="Create a password"
-                      value={userDetails.password}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
+
                 </div>
 
                 <div className="bg-muted p-4 rounded-lg">

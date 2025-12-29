@@ -16,6 +16,10 @@ import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, push, set, get, update } from 'firebase/database';
 
+
+import { useAuth } from '@/lib/auth';
+
+
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -300,7 +304,6 @@ const updateReferralStats = async (affiliateId: string, amount: number): Promise
 // Combined 10% + ₹100 Fixed Bonus for Direct Referral Link Purchase
 const giveCombinedReferralBonus = async (directReferrerId: string, customerName: string, productName: string, orderId: string, totalAmount: number): Promise<void> => {
   try {
-    // Calculate 10% commission
     const commissionAmount = Math.round(totalAmount * 0.10);
     const fixedBonusAmount = 100;
     const totalEarnings = commissionAmount + fixedBonusAmount;
@@ -423,6 +426,32 @@ const markUserAsPurchased = async (userId: string) => {
   }
 };
 
+// NEW FUNCTION: Fetch logged-in user data for pre-filling checkout form
+const getLoggedInUserData = async (uid: string) => {
+  if (!uid) return null;
+  
+  try {
+    const userRef = ref(firebaseDatabase, `affiliates/${uid}`); // Change to `users/${uid}` if your data is stored elsewhere
+    const snap = await get(userRef);
+    
+    if (snap.exists()) {
+      const data = snap.val();
+      return {
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        city: data.city || '',
+        state: data.state || '',
+        pincode: data.pincode || '',
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching logged-in user data:', error);
+  }
+  return null;
+};
+
 // Checkout Modal with Razorpay Integration
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -432,48 +461,88 @@ interface CheckoutModalProps {
   affiliateId?: string;
   customerId: string;
   uid?: string;
+  isLoggedIn: boolean; // ✅ ADD THIS
 }
 
-function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, customerId, uid }: CheckoutModalProps) {
+
+function CheckoutModal({
+  isOpen,
+  onClose,
+  product,
+  quantity,
+  affiliateId,
+  customerId,
+  uid,
+  isLoggedIn, // ✅ RECEIVE IT
+}: CheckoutModalProps) {
+
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
+
   const totalAmount = product.price * quantity;
-  
+
+  // Pre-fill form when modal opens if user is logged in
   useEffect(() => {
-    if (isOpen) {
-      setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
-     
-      // Load Razorpay script when modal opens
-      loadRazorpayScript().then((loaded) => {
-        setRazorpayLoaded(!!loaded);
-        if (!loaded) {
+   if (isOpen && uid && document.cookie.includes('swissgain_logged_in=true')) {
+      const fetchUserData = async () => {
+        const userData = await getLoggedInUserData(uid);
+        if (userData) {
+          setFormData({
+            name: userData.name,
+            email: userData.email,
+            phone: userData.phone,
+            address: userData.address,
+            city: userData.city,
+            state: userData.state,
+            pincode: userData.pincode,
+          });
           toast({
-            title: 'Payment System Error',
-            description: 'Failed to load payment system. Please refresh the page.',
-            variant: 'destructive',
+            title: "Details Auto-filled",
+            description: "Your saved information has been loaded from your account.",
           });
         }
-      });
+      };
+      fetchUserData();
+    } else if (isOpen) {
+      // Reset for guest users
+      setFormData({ name: "", email: "", phone: "", address: "", city: "", state: "", pincode: "" });
     }
-  }, [isOpen]);
+
+    // Load Razorpay script
+    loadRazorpayScript().then((loaded) => {
+      setRazorpayLoaded(!!loaded);
+      if (!loaded && isOpen) {
+        toast({
+          title: 'Payment System Error',
+          description: 'Failed to load payment system. Please refresh the page.',
+          variant: 'destructive',
+        });
+      }
+    });
+  }, [isOpen, uid, toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const generatePurchaseCustomerId = () => uid || `purchase_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 9)}`;
+ const generatePurchaseCustomerId = () =>
+  isLoggedIn && uid
+    ? uid
+    : `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
 
   // Process commissions after payment
   const processCommissionsAfterPayment = async (orderId: string, orderData: OrderData) => {
     try {
       // Combined 10% + ₹100 Bonus for Direct Referral Link
-      if (affiliateId && uid !== affiliateId) {
+      if (isLoggedIn && affiliateId && uid !== affiliateId) {
         const referrerSnap = await get(ref(firebaseDatabase, `affiliates/${affiliateId}`));
        
         if (referrerSnap.exists()) {
@@ -520,7 +589,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
     }
     const options = {
       key: RAZORPAY_CONFIG.key_id,
-      amount: totalAmount * 100, // Convert to paise
+      amount: totalAmount * 100,
       currency: 'INR',
       name: 'SwissGain',
       description: `Purchase: ${product.name}`,
@@ -538,7 +607,6 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
           };
           const orderId = await saveOrderToFirebase(paidOrderData);
           
-          // MARK USER AS PURCHASED - ONLY THIS ADDITION
           if (uid) {
             await markUserAsPurchased(uid);
           }
@@ -600,7 +668,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone || !formData.address) {
-      toast({ title: "Incomplete Form", variant: "destructive" });
+      toast({ title: "Incomplete Form", description: "Please fill all required fields.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -619,16 +687,34 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
         images: product.images,
         category: product.category,
         paymentMethod: 'razorpay',
-        paymentStatus: 'pending', // will change after payment
+        paymentStatus: 'pending',
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
-      // 🔥 Directly open Razorpay
+
+      // Optional: Save updated details back to user profile if logged in
+      if (uid) {
+        try {
+          await update(ref(firebaseDatabase, `affiliates/${uid}`), {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            pincode: formData.pincode,
+            lastUpdated: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.error("Failed to update user profile on checkout:", err);
+        }
+      }
+
       await initiateRazorpayPayment(orderData);
     } catch (err: any) {
       toast({
         title: "Checkout Failed",
-        description: err.message,
+        description: err.message || "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -671,6 +757,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               </div>
             </div>
           </div>
+
           {affiliateId && (
             <div className="bg-green-50 p-3 rounded-lg border border-green-200">
               <p className="text-sm font-medium text-green-800">Referral Purchase Detected</p>
@@ -679,12 +766,14 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               </p>
             </div>
           )}
+
           {uid && (
             <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-              <p className="text-sm font-medium text-blue-800">Affiliate Purchase</p>
-              <p className="text-xs text-blue-700 mt-1">Your upline will earn commissions on this purchase.</p>
+              <p className="text-sm font-medium text-blue-800">Logged in as Affiliate</p>
+              <p className="text-xs text-blue-700 mt-1">Your details are pre-filled. You can edit them below.</p>
             </div>
           )}
+
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
             <p className="text-sm font-medium text-blue-800">Your Customer ID</p>
             <div className="mt-2 flex items-center justify-between bg-white p-2 rounded border">
@@ -692,6 +781,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
               <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(customerId)}>Copy</Button>
             </div>
           </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Full Name *</Label>
@@ -742,6 +832,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                 </div>
               </div>
             </div>
+
             <Button
               type="submit"
               className="w-full gradient-primary text-primary-foreground py-3"
@@ -753,6 +844,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
                `Pay Securely ₹${totalAmount.toLocaleString()}`}
             </Button>
           </form>
+
           <div className="text-center text-xs text-gray-500">
             By completing your purchase, you agree to our Terms of Service and Privacy Policy.
           </div>
@@ -841,6 +933,7 @@ function ImageZoomModal({ isOpen, onClose, images, currentIndex: initialIndex }:
 const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Available';
 
 export default function ProductDetail() {
+   const { isLoggedIn } = useAuth(); 
   const [, params] = useRoute('/product/:id');
   const productId = params?.id;
   const getAffiliateIdFromUrl = () => {
@@ -868,9 +961,6 @@ export default function ProductDetail() {
       try {
         const res = await axios.get(`/api/products/${productId}`);
         if (res.data) {
-          // ✅ Fix: Use URLs directly—no prepending!
-          // Assume upload returns relative paths like '/uploads/filename.jpg' or full URLs.
-          // Next.js serves relative paths from /public automatically.
           const mainImage = res.data.image || null;
           const additionalImages = res.data.images ? 
             (Array.isArray(res.data.images) ? res.data.images : res.data.images.split(',').map((s: string) => s.trim()).filter(Boolean)) : 
@@ -883,7 +973,6 @@ export default function ProductDetail() {
             affiliateId
           });
 
-          // Same fix for related products
           const relatedRes = await axios.get(`/api/products?category=${res.data.category}`);
           setRelatedProducts(relatedRes.data.filter((p: any) => p._id !== res.data._id).slice(0, 4).map((p: any) => {
             const pMainImage = p.image || null;
@@ -915,18 +1004,23 @@ export default function ProductDetail() {
     });
   };
 
+  // yahan.................................
+  
+
   const handleBuyNow = () => {
-    if (!isInStock) {
+    if (!isLoggedIn) {
       toast({
-        title: 'Out of Stock',
-        description: 'This product is currently out of stock.',
+        title: 'Login Required',
+        description: 'Please login to continue checkout',
         variant: 'destructive',
       });
       return;
     }
+
     handleAddToCart();
     setIsCheckoutOpen(true);
   };
+
 
   const handleImageClick = (index: number) => {
     setSelectedImageIndex(index);
@@ -966,7 +1060,7 @@ export default function ProductDetail() {
                 onClick={() => handleImageClick(selectedImageIndex)}
                 loading="eager"
                 onError={(e) => {
-                  console.warn(`Failed to load image: ${e.currentTarget.src}`); // Debug log
+                  console.warn(`Failed to load image: ${e.currentTarget.src}`);
                   e.currentTarget.src = FALLBACK_IMAGE;
                 }}
               />
@@ -1166,14 +1260,16 @@ export default function ProductDetail() {
         </div>
       </div>
       <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        product={product}
-        quantity={quantity}
-        affiliateId={affiliateId}
-        customerId={customerId}
-        uid={uid}
-      />
+  isOpen={isCheckoutOpen}
+  onClose={() => setIsCheckoutOpen(false)}
+  product={product}
+  quantity={quantity}
+  affiliateId={affiliateId}
+  customerId={customerId}
+  uid={isLoggedIn ? uid : undefined}
+  isLoggedIn={isLoggedIn}
+/>
+
       <ImageZoomModal
         isOpen={isZoomOpen}
         onClose={() => setIsZoomOpen(false)}

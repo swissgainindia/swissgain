@@ -115,7 +115,15 @@ export const useAuth = () => {
   useEffect(() => {
     const saved = getCookie('swissgain_user');
     if (saved && !isLoggedOut) {
-      setUserData(JSON.parse(saved));
+     try {
+  const decoded = decodeURIComponent(saved);
+  setUserData(JSON.parse(decoded));
+} catch (err) {
+  console.error('Invalid user cookie, clearing it', err);
+  deleteCookie('swissgain_user');
+  setUserData(null);
+}
+
     }
   }, [isLoggedOut]);
 
@@ -138,7 +146,12 @@ export const useAuth = () => {
     setIsLoggedIn(true);
     setIsLoggedOut(false); // clear logout flag
     setUserData(safeData);
-    setCookie('swissgain_user', JSON.stringify(safeData), 365);
+   setCookie(
+  'swissgain_user',
+  encodeURIComponent(JSON.stringify(safeData)),
+  365
+);
+
   };
 
   const logout = () => {
@@ -148,6 +161,7 @@ export const useAuth = () => {
     setAffiliateData(null);
     deleteCookie('swissgain_logged_in');
     deleteCookie('swissgain_user');
+     deleteCookie('swissgain_uid');
     cleanup();
   };
 

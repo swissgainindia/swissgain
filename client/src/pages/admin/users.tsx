@@ -603,7 +603,7 @@ export default function AdminUsers() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="users">Affiliate Users</TabsTrigger>
           <TabsTrigger value="sales">All Sales</TabsTrigger>
-          <TabsTrigger value="products">Product Performance</TabsTrigger>
+          <TabsTrigger value="products" className="hidden">Product Performance</TabsTrigger>
         </TabsList>
         {/* Statistics Cards */}
         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -663,7 +663,7 @@ export default function AdminUsers() {
               </div>
               {activeTab === "users" && (
                 <>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  {/* <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-[180px]">
                       <Filter className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Filter by status" />
@@ -674,7 +674,7 @@ export default function AdminUsers() {
                       <SelectItem value="inactive">Inactive</SelectItem>
                       <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
-                  </Select>
+                  </Select> */}
                   <Select value={rankFilter} onValueChange={setRankFilter}>
                     <SelectTrigger className="w-[180px]">
                       <Filter className="h-4 w-4 mr-2" />
@@ -711,9 +711,9 @@ export default function AdminUsers() {
                       <TableHead>User Info</TableHead>
                       <TableHead>Join Date</TableHead>
                       <TableHead>Rank</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead>Sales Performance</TableHead>
-                      <TableHead>Actions</TableHead>
+                      {/* <TableHead>Status</TableHead> */}
+                      {/* <TableHead>Actions</TableHead> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -753,11 +753,13 @@ export default function AdminUsers() {
                             <TableCell>
                               {getRankBadge(user.rank)}
                             </TableCell>
-                            <TableCell>
+                              
+                            {/* <TableCell>
                               <Badge variant={getStatusBadgeVariant(user.status)} className={getStatusColor(user.status)}>
                                 {user.status.toUpperCase()}
                               </Badge>
-                            </TableCell>
+                            </TableCell> */}
+                            
                             <TableCell>
                               <div className="space-y-1 text-sm">
                                 <div className="flex justify-between gap-2">
@@ -777,7 +779,7 @@ export default function AdminUsers() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-2 hidden">
                                 <Select
                                   value={user.status}
                                   onValueChange={(value) => handleStatusChange(user.id, value)}

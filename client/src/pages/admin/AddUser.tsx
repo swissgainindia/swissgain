@@ -39,7 +39,16 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, get, remove, update } from 'firebase/database';
-import { Handshake, UserPlus, Users, Edit, Trash2 } from 'lucide-react';
+import { Handshake, UserPlus, Users, Edit, Trash2, MoreVertical, Link as LinkIcon } from 'lucide-react';
+
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -819,27 +828,50 @@ const AdminAffiliates: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell>{new Date(affiliate.joinDate).toLocaleDateString()}</TableCell>
-                        <TableCell className="space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => setEditingAffiliate(affiliate)}>
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          {!affiliate.hasEditedReferral && (
-                            <Button variant="outline" size="sm" onClick={() => setEditingReferralAffiliate(affiliate)}>
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit Referral
-                            </Button>
-                          )}
-                          <Button variant="destructive" size="sm" onClick={() => setDeletingUid(affiliate.uid)}>
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={affiliate.referralLink} target="_blank" rel="noopener noreferrer">
-                              View Link
-                            </a>
-                          </Button>
-                        </TableCell>
+                       <TableCell className="text-right">
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="icon">
+        <MoreVertical className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+
+    <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuItem onClick={() => setEditingAffiliate(affiliate)}>
+        <Edit className="mr-2 h-4 w-4" />
+        Edit
+      </DropdownMenuItem>
+
+      {!affiliate.hasEditedReferral && (
+        <DropdownMenuItem onClick={() => setEditingReferralAffiliate(affiliate)}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit Referral
+        </DropdownMenuItem>
+      )}
+
+      <DropdownMenuItem asChild>
+        <a
+          href={affiliate.referralLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center"
+        >
+          <LinkIcon className="mr-2 h-4 w-4" />
+          View Link
+        </a>
+      </DropdownMenuItem>
+
+      <DropdownMenuItem
+        className="text-red-600 focus:text-red-600"
+        onClick={() => setDeletingUid(affiliate.uid)}
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        Delete
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</TableCell>
+
                       </TableRow>
                     ))}
                   </TableBody>
