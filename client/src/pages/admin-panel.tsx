@@ -19,6 +19,7 @@ import AdminSupportCenter from "./admin/AdminSupportCenter";
 import RoleManagement from "./admin/role";
 import BannerManager from "./admin/BannerManager";
 import AddUser from "./admin/AddUser";
+import CreateOrders from "./admin/CreateOrders";
 
 // Import shared Firebase
 import { database } from "@/lib/firebase";
@@ -339,6 +340,7 @@ export default function AdminPanel() {
     { id: "role", label: "Role Management", icon: Users },
     { id: "banner", label: "Banner Management", icon: Users },
      { id: "adduser", label: "Add User", icon: Users },
+    { id: "createorders", label: "Create Orders", icon: ShoppingBag },
   ];
 
   const getAllowedMenu = () => {
@@ -369,6 +371,7 @@ export default function AdminPanel() {
       case "role": return <RoleManagement />;
       case "banner": return <BannerManager />;
       case "adduser": return <AddUser />;
+      case "createorders": return <CreateOrders />;
       default: return <AdminDashboard />;
     }
   };
