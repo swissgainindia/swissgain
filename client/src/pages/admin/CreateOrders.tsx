@@ -10,10 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { ref, get, push, set } from 'firebase/database';
+import { ref, get, push, set, update } from 'firebase/database';
 import { database } from '@/lib/firebase';
 import axios from 'axios';
-import { Package, User, Users, Search, CheckCircle, ChevronDown } from 'lucide-react';
+import { Package, User, Users, CheckCircle, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Product {
@@ -36,6 +36,25 @@ interface Affiliate {
   pincode: string;
 }
 
+// Shared function to grant dashboard access (same as in your admin panel)
+const grantDashboardAccess = async (uid: string) => {
+  try {
+    const affiliateRef = ref(database, `affiliates/${uid}`);
+    const updates: any = {
+      hasPurchasedProduct: true,
+      lastPurchaseDate: new Date().toISOString(),
+      purchaseVerified: true,
+      forceAccessGranted: true,
+      lastUpdated: new Date().toISOString(),
+    };
+    await update(affiliateRef, updates);
+    return true;
+  } catch (error) {
+    console.error('Error granting dashboard access:', error);
+    return false;
+  }
+};
+
 export default function CreateOrders() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -45,15 +64,11 @@ export default function CreateOrders() {
   const [quantity, setQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'prepaid'>('cod');
 
-  // Purchase type: guest or existing affiliate
- const [purchaseType, setPurchaseType] = useState<string>('');
-
+  const [purchaseType, setPurchaseType] = useState<'affiliate' | ''>('');
   const [selectedBuyer, setSelectedBuyer] = useState<Affiliate | null>(null);
   const [openBuyerPopover, setOpenBuyerPopover] = useState(false);
 
-  // Referrer (who referred this customer)
   const [referrerAffiliateId, setReferrerAffiliateId] = useState<string>('');
-
 
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
@@ -65,7 +80,6 @@ export default function CreateOrders() {
     pincode: '',
   });
 
-  // Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -85,7 +99,6 @@ export default function CreateOrders() {
     fetchProducts();
   }, [toast]);
 
-  // Fetch affiliates
   useEffect(() => {
     const fetchAffiliates = async () => {
       try {
@@ -113,7 +126,6 @@ export default function CreateOrders() {
     fetchAffiliates();
   }, [toast]);
 
-  // Auto-fill customer info when affiliate is selected
   useEffect(() => {
     if (selectedBuyer && purchaseType === 'affiliate') {
       setCustomerInfo({
@@ -125,9 +137,9 @@ export default function CreateOrders() {
         state: selectedBuyer.state,
         pincode: selectedBuyer.pincode,
       });
-   } else if (!purchaseType) {
-  setCustomerInfo({ name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '' });
-}
+    } else {
+      setCustomerInfo({ name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '' });
+    }
   }, [selectedBuyer, purchaseType]);
 
   const selectedProduct = products.find(p => p._id === selectedProductId);
@@ -205,7 +217,6 @@ export default function CreateOrders() {
     try {
       const finalCustomerId = purchaseType === 'affiliate' && selectedBuyer ? selectedBuyer.uid : generateGuestId();
 
-      // CRITICAL FIX: Never include undefined values
       const orderData: any = {
         productId: selectedProduct._id,
         customerId: finalCustomerId,
@@ -223,34 +234,52 @@ export default function CreateOrders() {
         createdAt: new Date().toISOString(),
       };
 
-      // Only add affiliateId if referrer exists and is not empty
       if (referrerAffiliateId.trim()) {
         orderData.affiliateId = referrerAffiliateId.trim();
       }
 
       const orderId = await saveOrderToFirebase(orderData);
 
-      // Credit referrer bonus if provided
+      // === NEW FEATURE: Grant dashboard access on first purchase ===
+      if (purchaseType === 'affiliate' && selectedBuyer) {
+        const affiliateRef = ref(database, `affiliates/${selectedBuyer.uid}`);
+        const snap = await get(affiliateRef);
+        if (snap.exists()) {
+          const data = snap.val();
+          const alreadyHasAccess = data.hasPurchasedProduct || data.forceAccessGranted;
+
+          if (!alreadyHasAccess) {
+            const success = await grantDashboardAccess(selectedBuyer.uid);
+            if (success) {
+              toast({
+                title: "Dashboard Access Granted! 🎉",
+                description: `${selectedBuyer.name} now has full dashboard access.`,
+              });
+            }
+          }
+        }
+      }
+
+      // Credit referrer if any
       if (referrerAffiliateId.trim()) {
         const refSnap = await get(ref(database, `affiliates/${referrerAffiliateId.trim()}`));
         if (refSnap.exists()) {
           await creditReferralBonus(referrerAffiliateId.trim(), orderId, totalAmount);
         } else {
-          toast({ description: 'Referrer affiliate not found', variant: 'destructive' });
+          toast({ description: 'Referrer not found', variant: 'destructive' });
         }
       }
 
       toast({
         title: 'Success!',
-        description: `Order #${orderId} created successfully for ₹${totalAmount.toLocaleString()}`,
+        description: `Order #${orderId} created for ₹${totalAmount.toLocaleString()}`,
       });
 
       // Reset form
       setSelectedProductId('');
       setQuantity(1);
       setPaymentMethod('cod');
-     setPurchaseType('');
-
+      setPurchaseType('');
       setSelectedBuyer(null);
       setReferrerAffiliateId('');
       setCustomerInfo({ name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '' });
@@ -285,25 +314,17 @@ export default function CreateOrders() {
                 <Users className="h-6 w-6" />
                 This Order is For
               </Label>
-         <Select
-  value={purchaseType}
-  onValueChange={(v: string) => {
-    setPurchaseType(v);
-    setSelectedBuyer(null);
-  }}
->
-  <SelectTrigger className="text-lg">
-    <SelectValue placeholder="Select Customer" />
-  </SelectTrigger>
-
-  <SelectContent>
-    <SelectItem value="affiliate">
-      Existing Affiliate (Registered)
-    </SelectItem>
-  </SelectContent>
-</Select>
-
-
+              <Select value={purchaseType} onValueChange={(v: any) => {
+                setPurchaseType(v);
+                setSelectedBuyer(null);
+              }}>
+                <SelectTrigger className="text-lg">
+                  <SelectValue placeholder="Select customer type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="affiliate">Existing Affiliate (Registered)</SelectItem>
+                </SelectContent>
+              </Select>
 
               {purchaseType === 'affiliate' && (
                 <div className="mt-6">
@@ -400,7 +421,7 @@ export default function CreateOrders() {
               </Select>
             </div>
 
-            {/* Referrer */}
+            {/* Referrer (Hidden as per your request) */}
             <div className="space-y-2 hidden">
               <Label>Referred By (Optional)</Label>
               <Input
@@ -408,7 +429,6 @@ export default function CreateOrders() {
                 value={referrerAffiliateId}
                 onChange={(e) => setReferrerAffiliateId(e.target.value.trim())}
               />
-              <p className="text-sm text-muted-foreground">Will receive 10% commission + ₹100 bonus</p>
             </div>
 
             {/* Customer Details */}
@@ -451,7 +471,7 @@ export default function CreateOrders() {
 
             {/* Submit */}
             <div className="pt-8 border-t">
-              <Button type="submit" size="lg" className="w-full text-lg py-6" disabled={loading || !selectedProduct}>
+              <Button type="submit" size="lg" className="w-full text-lg py-6" disabled={loading || !selectedProduct || purchaseType === ''}>
                 {loading ? 'Creating Order...' : (
                   <>
                     <CheckCircle className="mr-2 h-6 w-6" />
