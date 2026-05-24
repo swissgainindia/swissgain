@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import ProductCard from '@/components/product-card';
+import ProductSkeleton from '@/components/product-skeleton';
 import { Search, Filter, Grid3X3, List, SlidersHorizontal } from 'lucide-react';
 import axios from 'axios';
 import { initializeApp, getApps } from 'firebase/app';
@@ -195,7 +196,23 @@ export default function Products() {
     return filtered;
   }, [processedProducts, searchQuery, selectedCategory, sortBy]);
 
-  if (loading) return <div className="py-20 text-center text-xl">Loading products...</div>;
+  if (loading) {
+    return (
+      <div className="py-20 bg-muted min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <div className="h-10 bg-gray-200 rounded animate-pulse w-64 mb-4" />
+            <div className="h-6 bg-gray-200 rounded animate-pulse w-96" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <ProductSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-20 bg-muted min-h-screen">

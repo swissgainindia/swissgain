@@ -10,6 +10,7 @@ export interface Product {
   description: string;
   features: string[];
   inStock: boolean;
+  stockQuantity?: number;
   rating: number;
   reviews: number;
   videoType?: 'upload' | 'youtube' | '';

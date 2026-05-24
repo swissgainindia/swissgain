@@ -141,7 +141,13 @@ export default function ProductCard({ product }: ProductCardProps) {
                 </span>
               )}
             </div>
-            {!isInStock && <Badge variant="secondary">Out of Stock</Badge>}
+            {!isInStock ? (
+              <Badge variant="secondary">Out of Stock</Badge>
+            ) : product.stockQuantity && product.stockQuantity > 0 && product.stockQuantity < 6 ? (
+              <Badge variant="destructive" className="animate-pulse bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center gap-1 border-0">
+                🔥 Only {product.stockQuantity} left!
+              </Badge>
+            ) : null}
           </div>
         </CardContent>
       </Card>

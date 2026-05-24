@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import ProductCard from "@/components/product-card";
+import ProductSkeleton from "@/components/product-skeleton";
 import { ChevronRight } from "lucide-react";
 import axios from "axios";
 
@@ -64,9 +65,21 @@ export default function FeaturedProductsSection() {
 
   if (loading) {
     return (
-      <div className="text-center py-20 text-muted-foreground">
-        Loading products...
-      </div>
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <div className="h-10 bg-gray-200 rounded animate-pulse w-48 mb-3" />
+              <div className="h-6 bg-gray-200 rounded animate-pulse w-72" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <ProductSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </section>
     );
   }
 

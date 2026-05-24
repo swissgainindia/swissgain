@@ -1133,6 +1133,15 @@ export default function ProductDetail() {
               <p className="text-muted-foreground text-lg mb-6">{product.description}</p>
             </div>
 
+            {isInStock && product.stockQuantity && product.stockQuantity > 0 && product.stockQuantity < 6 && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center space-x-2 animate-pulse">
+                <span className="text-xl">🔥</span>
+                <span className="font-semibold text-sm">
+                  Hurry! Only {product.stockQuantity} left in stock. This premium piece is selling fast!
+                </span>
+              </div>
+            )}
+
             {/* Quantity & Buttons */}
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
@@ -1191,19 +1200,28 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Trust Badges */}
-            <div className="grid grid-cols-3 gap-4 pt-6 border-t">
-              <div className="text-center">
-                <Truck className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Free Shipping</p>
+            {/* Premium Trust Guarantees */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-6 border-t border-gray-100">
+              <div className="flex items-center space-x-3 p-3 bg-green-50/60 rounded-xl border border-green-100/50 shadow-sm transition-all duration-300 hover:shadow-md">
+                <span className="text-2xl">🔒</span>
+                <div>
+                  <h4 className="font-bold text-xs text-green-900 leading-tight">Secure Checkout</h4>
+                  <p className="text-[10px] text-green-700 mt-0.5">Encrypted transactions</p>
+                </div>
               </div>
-              <div className="text-center">
-                <Shield className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Secure Payment</p>
+              <div className="flex items-center space-x-3 p-3 bg-amber-50/60 rounded-xl border border-amber-100/50 shadow-sm transition-all duration-300 hover:shadow-md">
+                <span className="text-2xl">✨</span>
+                <div>
+                  <h4 className="font-bold text-xs text-amber-900 leading-tight">Premium Craftsmanship</h4>
+                  <p className="text-[10px] text-amber-700 mt-0.5">1 Gram Gold Plated</p>
+                </div>
               </div>
-              <div className="text-center">
-                <Check className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Quality Assured</p>
+              <div className="flex items-center space-x-3 p-3 bg-blue-50/60 rounded-xl border border-blue-100/50 shadow-sm transition-all duration-300 hover:shadow-md">
+                <span className="text-2xl">🚚</span>
+                <div>
+                  <h4 className="font-bold text-xs text-blue-900 leading-tight">Free Shipping</h4>
+                  <p className="text-[10px] text-blue-700 mt-0.5">Worldwide tracked delivery</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1288,34 +1306,44 @@ export default function ProductDetail() {
               {/* Reviews List */}
               <div className="grid gap-4">
                 {reviews.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {totalReviewCount > 0 
-                      ? "Showing aggregate rating from external platforms and direct sales." 
-                      : "No reviews yet. Be the first to review!"}
+                  <div className="text-center py-12 border border-dashed rounded-xl bg-gray-50/50">
+                    <div className="text-4xl mb-3">✨</div>
+                    <p className="text-muted-foreground font-medium mb-1">
+                      {totalReviewCount > 0 
+                        ? "Showing aggregate rating from direct sales and external platforms." 
+                        : "No reviews yet for this jewelry piece."}
+                    </p>
+                    <p className="text-sm text-[#7b3306] font-semibold mt-2 animate-pulse">
+                      Be the first to review this premium piece
+                    </p>
                   </div>
                 ) : (
                   reviews.map((review, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-white shadow-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                            {review.userName.charAt(0)}
+                    <div key={index} className="border border-gray-100 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-300">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-[#7b3306]/10 flex items-center justify-center text-[#7b3306] font-bold text-sm">
+                            {review.userName.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-semibold">{review.userName}</span>
-                          <Badge variant="secondary" className="text-xs ml-2 flex items-center gap-1">
-                            <Check className="h-3 w-3" /> Verified Buyer
-                          </Badge>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-foreground text-sm">{review.userName}</span>
+                              <Badge variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-50 text-[10px] py-0.5 px-2 flex items-center gap-1 border border-green-100/50">
+                                <Check className="h-3 w-3" /> Verified Buyer
+                              </Badge>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground block mt-0.5">
+                              {new Date(review.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(review.createdAt).toLocaleDateString()}
-                        </span>
                       </div>
-                      <div className="flex text-yellow-400 mb-2">
+                      <div className="flex text-yellow-400 gap-0.5 mb-2.5">
                         {[...Array(5)].map((_, i) => (
-                          <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'fill-current' : 'text-gray-300'}`} />
+                          <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />
                         ))}
                       </div>
-                      <p className="text-gray-700">{review.comment}</p>
+                      <p className="text-gray-700 text-sm leading-relaxed">{review.comment}</p>
                     </div>
                   ))
                 )}
