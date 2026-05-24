@@ -124,6 +124,14 @@ const BannerManager = () => {
 
         bannerData.youtubeUrl = youtubeUrl;
         bannerData.thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+      } else if (bannerType === "video") {
+        if (!youtubeUrl) {
+          alert("Please enter a direct video URL");
+          setLoading(false);
+          return;
+        }
+        (bannerData as any).videoUrl = youtubeUrl;
+        (bannerData as any).thumbnail = "https://via.placeholder.com/400x300?text=Direct+Video+Banner";
       }
 
       /* 2) Save in Firebase */
@@ -166,6 +174,16 @@ const BannerManager = () => {
               className="w-4 h-4"
             />
             <span>YouTube Video</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              value="video"
+              checked={bannerType === "video"}
+              onChange={() => setBannerType("video")}
+              className="w-4 h-4"
+            />
+            <span>Direct Video URL</span>
           </label>
         </div>
       </div>
@@ -222,6 +240,26 @@ const BannerManager = () => {
           />
           <p className="text-xs text-gray-500 mt-1">
             Example: https://youtu.be/ipcvINIbeDY or https://youtube.com/watch?v=ipcvINIbeDY
+          </p>
+        </div>
+      )}
+
+      {/* ✅ DIRECT VIDEO URL SECTION */}
+      {bannerType === "video" && (
+        <div>
+          <p className="text-sm font-semibold mb-2">Direct Video URL (MP4/WebM):</p>
+          <input
+            type="text"
+            value={youtubeUrl}
+            onChange={(e) => {
+              setYoutubeUrl(e.target.value);
+              setPreview(null);
+            }}
+            placeholder="https://cloudinary.com/.../video.mp4"
+            className="w-full p-2 border rounded"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter direct Cloudinary or host video link.
           </p>
         </div>
       )}

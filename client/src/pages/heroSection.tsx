@@ -17,7 +17,7 @@ const firebaseConfig = {
 
 // Singleton pattern to prevent multiple initializations
 let app;
-let database;
+let database: any;
 try {
     app = initializeApp(firebaseConfig);
     database = getDatabase(app);
@@ -26,7 +26,7 @@ try {
 }
 
 const HeroSection = () => {
-  const [banner, setBanner] = useState(null);
+  const [banner, setBanner] = useState<any>(null);
   const [bannerType, setBannerType] = useState("image");
 
   useEffect(() => {
@@ -43,7 +43,7 @@ const HeroSection = () => {
     return () => off(bannerRef);
   }, []);
 
-  const extractYouTubeId = (url) => {
+  const extractYouTubeId = (url: string) => {
     if (!url) return null;
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
@@ -66,6 +66,20 @@ const HeroSection = () => {
             animate={{ opacity: 1 }}
             transition={{ duration: 1.8 }}
           />
+        )}
+
+        {banner && (bannerType === "video" || bannerType === "upload") && (banner.videoUrl || banner.image) && (
+          <div className="w-full h-full flex items-center justify-center pointer-events-none">
+            <video
+              src={banner.videoUrl || banner.image}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover pointer-events-none"
+            />
+            <div className="absolute inset-0 bg-black/30 z-10"></div>
+          </div>
         )}
 
         {banner && bannerType === "youtube" && banner.youtubeUrl && (
