@@ -20,6 +20,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
   const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [additionalImageFiles, setAdditionalImageFiles] = useState<File[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   
   // Initialize form data
@@ -38,6 +39,8 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
     stockQuantity: "",
     rating: "0",
     ratingCount: "0",
+    videoType: "",
+    videoUrl: "",
   });
 
   // ✅ FIX: Update form data when 'product' prop changes
@@ -59,6 +62,8 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         // Convert numbers to strings for the input fields
         rating: product.rating !== undefined ? product.rating.toString() : "0",
         ratingCount: product.ratingCount !== undefined ? product.ratingCount.toString() : "0",
+        videoType: product.videoType || "",
+        videoUrl: product.videoUrl || "",
       });
     }
   }, [product]);
@@ -142,10 +147,23 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         }
       }
 
+      let videoUrl = formData.videoUrl;
+      // Upload video if Direct Upload is selected and a new video file is selected
+      if (formData.videoType === "upload" && videoFile) {
+        const uploadData = new FormData();
+        uploadData.append("image", videoFile); // Multer is configured for 'image' field in upload.single('image')
+        const res = await fetch("/api/admin/upload", { method: "POST", body: uploadData });
+        if (!res.ok) throw new Error("Video upload failed");
+        const data = await res.json();
+        videoUrl = data.imageUrl;
+      }
+
       const productData = {
         ...formData,
         image: imageUrl,
         images: additionalImageUrls,
+        videoType: formData.videoType === "none" ? "" : formData.videoType,
+        videoUrl: formData.videoType === "youtube" ? formData.videoUrl : videoUrl,
         price: parseFloat(formData.price as string),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice as string) : undefined,
         discount: formData.discount ? parseFloat(formData.discount as string) : undefined,
@@ -171,6 +189,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
       setLoading(false);
       setImageFile(null);
       setAdditionalImageFiles([]);
+      setVideoFile(null);
     }
   };
 
@@ -272,6 +291,51 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         </div>
 
         <div className="space-y-2"><Label htmlFor="features">Features (comma-separated)</Label><Textarea id="features" value={formData.features} onChange={(e) => handleChange("features", e.target.value)} rows={3} /></div>
+
+        {/* Video Preview Section */}
+        <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 space-y-4">
+          <h3 className="font-semibold text-lg text-slate-800">Video Preview (Hover Effect)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="videoType">Video Type</Label>
+              <Select value={formData.videoType || "none"} onValueChange={(value) => {
+                setFormData(prev => ({ ...prev, videoType: value === "none" ? "" : value, videoUrl: "" }));
+                setVideoFile(null);
+              }}>
+                <SelectTrigger><SelectValue placeholder="Select video type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="upload">Direct Upload (Cloudinary)</SelectItem>
+                  <SelectItem value="youtube">YouTube URL</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.videoType === "youtube" && (
+              <div className="space-y-2">
+                <Label htmlFor="videoUrl">YouTube Video URL</Label>
+                <Input id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." value={formData.videoUrl} onChange={(e) => handleChange("videoUrl", e.target.value)} required />
+              </div>
+            )}
+
+            {formData.videoType === "upload" && (
+              <div className="space-y-2">
+                <Label htmlFor="videoFile">Upload Video File</Label>
+                <div className="space-y-2">
+                  {formData.videoUrl && (
+                    <div className="text-sm text-slate-600 flex items-center gap-2">
+                      <span className="font-medium">Current Video:</span>
+                      <a href={formData.videoUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 underline line-clamp-1">
+                        Play Video URL
+                      </a>
+                    </div>
+                  )}
+                  <Input id="videoFile" type="file" accept="video/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setVideoFile(file); }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
         
         <div className="flex gap-4">
           <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Product"}</Button>

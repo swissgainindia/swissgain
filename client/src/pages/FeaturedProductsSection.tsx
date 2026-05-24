@@ -4,16 +4,7 @@ import ProductCard from "@/components/product-card";
 import { ChevronRight } from "lucide-react";
 import axios from "axios";
 
-interface Product {
-  _id: string;
-  name: string;
-  image: string;
-  price: number;
-  category: string;
-  inStock: boolean;
-  stockQuantity: number;
-  description: string;
-}
+import { Product } from "@/types";
 
 export default function FeaturedProductsSection() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,17 +22,37 @@ export default function FeaturedProductsSection() {
       const data = res.data;
 
       // ✅ Normalize response → ALWAYS an array
-      let productList: Product[] = [];
+      let rawList: any[] = [];
 
       if (Array.isArray(data)) {
-        productList = data;
+        rawList = data;
       } else if (Array.isArray(data?.products)) {
-        productList = data.products;
+        rawList = data.products;
       } else if (typeof data === "object" && data !== null) {
-        productList = Object.values(data);
+        rawList = Object.values(data);
       }
 
-      setProducts(productList.slice(0, 8));
+      const mappedList: Product[] = rawList.map((p: any) => ({
+        id: p._id,
+        _id: p._id,
+        name: p.name,
+        image: p.image,
+        price: p.price,
+        originalPrice: p.originalPrice,
+        discount: p.discount,
+        category: p.category,
+        inStock: p.inStock,
+        stockQuantity: p.stockQuantity || 0,
+        description: p.description,
+        images: p.images || [],
+        features: p.features || [],
+        rating: p.rating || 0,
+        reviews: p.ratingCount || 0,
+        videoType: p.videoType || "",
+        videoUrl: p.videoUrl || "",
+      }));
+
+      setProducts(mappedList.slice(0, 8));
     } catch (err) {
       console.error("Failed to fetch products:", err);
       setError("Failed to load products");
@@ -93,7 +104,7 @@ export default function FeaturedProductsSection() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
           {products.length > 0 ? (
             products.map((product) => (
-              <ProductCard key={product._id} product={product} />
+              <ProductCard key={product.id} product={product} />
             ))
           ) : (
             <p className="col-span-full text-center text-muted-foreground">

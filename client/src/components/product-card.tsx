@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +14,9 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const { updateData } = useLocalStorage();
   const { toast } = useToast();
+  const [isHovered, setIsHovered] = useState(false);
   const isInStock = product.inStock && (product.stockQuantity || 0) > 0;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     if (!isInStock) return;
     e.preventDefault();
@@ -25,14 +28,56 @@ export default function ProductCard({ product }: ProductCardProps) {
       description: `${product.name} added to your cart.`,
     });
   };
+
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return "";
+    let videoId = "";
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      videoId = match[2];
+    }
+    if (videoId) {
+      return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&showinfo=0&rel=0&enablejsapi=1`;
+    }
+    return url;
+  };
+
   return (
     <Link href={`/product/${product._id}`}>
       <Card className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] overflow-hidden">
-        <div className="relative overflow-hidden">
+        <div 
+          className="relative overflow-hidden h-64"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          {isHovered && product.videoUrl && product.videoType === 'upload' && (
+            <video
+              src={product.videoUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover z-10"
+            />
+          )}
+
+          {isHovered && product.videoUrl && product.videoType === 'youtube' && (
+            <div className="absolute inset-0 w-full h-full z-10 overflow-hidden pointer-events-none">
+              <iframe
+                src={getYouTubeEmbedUrl(product.videoUrl)}
+                title={product.name}
+                className="w-full h-full border-0 pointer-events-none scale-[1.3]"
+                allow="autoplay; encrypted-media"
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          )}
+
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-110"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
           />
           {product.discount && (
             <Badge variant="destructive" className="absolute top-3 left-3 font-semibold">

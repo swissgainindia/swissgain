@@ -12,6 +12,8 @@ export interface Product {
   inStock: boolean;
   rating: number;
   reviews: number;
+  videoType?: 'upload' | 'youtube' | '';
+  videoUrl?: string;
 }
 
 export interface CartItem {

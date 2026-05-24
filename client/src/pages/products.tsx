@@ -40,6 +40,7 @@ const FALLBACK_IMAGE = 'https://via.placeholder.com/400x400?text=No+Image+Availa
 const BASE_IMAGE_URL = 'https://swissgainindia.com'; 
 
 interface Product {
+  id: string;
   _id: string;
   name: string;
   slug: string;
@@ -47,15 +48,17 @@ interface Product {
   price: number;
   originalPrice?: number;
   discount?: number;
-  category: string;
+  category: any;
   image: string;
-  images?: string[] | string;
-  features?: string[];
+  images: string[];
+  features: string[];
   inStock: boolean;
   stockQuantity: number;
   rating?: number;
   reviews?: number; // Used for display count
   ratingCount?: number; // From backend
+  videoType?: 'upload' | 'youtube' | '';
+  videoUrl?: string;
 }
 
 const categories = [
@@ -92,8 +95,9 @@ export default function Products() {
     const fetchProducts = async () => {
       try {
         const res = await axios.get('/api/products');
-        const fetchedProducts = res.data.map((product: Product) => ({
+        const fetchedProducts = res.data.map((product: any) => ({
           ...product,
+          id: product._id,
           // Map backend 'ratingCount' to 'reviews' for consistency
           reviews: product.ratingCount || 0, 
           image: product.image
@@ -101,9 +105,12 @@ export default function Products() {
             : FALLBACK_IMAGE,
           images: product.images
             ? Array.isArray(product.images)
-              ? product.images.map((img) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)
-              : product.images.split(',').map((s) => s.trim()).filter((s) => s).map((img) => (img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`))
+              ? product.images.map((img: string) => img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`)
+              : product.images.split(',').map((s: string) => s.trim()).filter((s: string) => s).map((img: string) => (img.startsWith('http') ? img : `${BASE_IMAGE_URL}${img}`))
             : [],
+          features: product.features || [],
+          videoType: product.videoType || "",
+          videoUrl: product.videoUrl || "",
         }));
         setProducts(fetchedProducts);
       } catch (error) {
