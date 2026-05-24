@@ -18,6 +18,7 @@ export interface IProduct extends Document {
   sales?: number;
   videoType?: 'upload' | 'youtube' | '';
   videoUrl?: string;
+  sortOrder?: number;
 }
 
 const ProductSchema: Schema = new Schema({
@@ -37,7 +38,8 @@ const ProductSchema: Schema = new Schema({
   ratingCount: { type: Number, default: 0 }, // ✅ Changed from 'reviews' to 'ratingCount'
   sales: { type: Number, default: 0 },
   videoType: { type: String, enum: ['upload', 'youtube', ''], default: '' },
-  videoUrl: { type: String, default: '' }
+  videoUrl: { type: String, default: '' },
+  sortOrder: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // Check if model exists before compiling to prevent overwrite errors in dev

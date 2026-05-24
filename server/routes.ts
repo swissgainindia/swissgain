@@ -78,7 +78,7 @@ export async function registerRoutes(app: Express) {
 
   // PUBLIC PRODUCT ROUTES
   router.get("/products", async (_req, res) => {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const products = await Product.find().sort({ sortOrder: 1, createdAt: -1 });
     res.json(products);
   });
   router.get("/products/:id", async (req, res) => {
@@ -88,6 +88,28 @@ export async function registerRoutes(app: Express) {
   });
 
   // ADMIN PRODUCTS
+  router.put("/admin/products/reorder", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const { products } = req.body;
+      if (!Array.isArray(products)) {
+        return res.status(400).json({ message: "Invalid payload: products must be an array" });
+      }
+
+      const operations = products.map((item: { id: string; sortOrder: number }) => ({
+        updateOne: {
+          filter: { _id: item.id },
+          update: { $set: { sortOrder: item.sortOrder } }
+        }
+      }));
+
+      await Product.bulkWrite(operations);
+      res.json({ message: "Product order updated successfully" });
+    } catch (error: any) {
+      console.error("Reorder products error:", error);
+      res.status(500).json({ message: error.message || "Failed to reorder products" });
+    }
+  });
+
   router.post("/admin/products", authMiddleware, adminMiddleware, async (req, res) => {
     const product = new Product(req.body);
     await product.save();

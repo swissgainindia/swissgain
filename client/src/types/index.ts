@@ -15,6 +15,7 @@ export interface Product {
   reviews: number;
   videoType?: 'upload' | 'youtube' | '';
   videoUrl?: string;
+  sortOrder?: number;
 }
 
 export interface CartItem {

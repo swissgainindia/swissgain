@@ -99,6 +99,15 @@ export const deleteProduct = async (id: string) => {
   return response.json();
 };
 
+export const reorderProducts = async (products: { id: string; sortOrder: number }[]) => {
+  const response = await apiRequest("/api/admin/products/reorder", {
+    method: "PUT",
+    body: JSON.stringify({ products }),
+  });
+  if (!response.ok) throw new Error("Failed to reorder products");
+  return response.json();
+};
+
 export const fetchCategories = async () => {
   const response = await apiRequest("/api/categories");
   if (!response.ok) throw new Error("Failed to fetch categories");
