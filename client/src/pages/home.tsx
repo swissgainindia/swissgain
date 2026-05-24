@@ -1,6 +1,7 @@
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/product-card';
+import SEO from '@/components/layout/seo';
 import { products, getFeaturedProducts } from '@/data/products';
 import { Star, Shield, Truck, ShoppingBag, Handshake, ChevronRight, Crown, Award, Users } from 'lucide-react';
 import Banner1 from "@/images/banner-luxury-2.png"
@@ -17,6 +18,13 @@ import FeaturedProductsSection from './FeaturedProductsSection'
 export default function Home() {
   return (
     <div>
+      <SEO 
+        title="SwissGain India | Premium 1 Gram Gold Plated Jewelry"
+        description="Shop the best 1 gram gold plated jewelry from SwissGain India. High quality bracelets, chains, necklaces, rings, and earrings with premium Swiss craftsmanship."
+        url="/"
+        type="website"
+      />
+      <h1 className="sr-only">SwissGain India - Premium 1 Gram Gold Plated Jewelry</h1>
       <HeroSection />
 
      

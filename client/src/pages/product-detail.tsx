@@ -11,6 +11,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '@/components/product-card';
+import SEO from '@/components/layout/seo';
 import { 
   Star, Check, ShoppingCart, Zap, Truck, Shield, 
   Plus, Minus, ArrowLeft, CreditCard, X, ChevronLeft, ChevronRight 
@@ -1038,6 +1039,15 @@ export default function ProductDetail() {
 
   return (
     <div className="py-20 bg-white">
+      {product && (
+        <SEO 
+          title={`${product.name} - Premium 1 Gram Gold Plated Jewelry | SwissGain India`}
+          description={product.description}
+          image={product.images && product.images[0] ? product.images[0] : product.image}
+          url={`/product/${product._id}`}
+          type="product"
+        />
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Breadcrumb Navigation */}

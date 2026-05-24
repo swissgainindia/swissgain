@@ -216,6 +216,76 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // DYNAMIC SITEMAP XML ROUTE
+  app.get("/sitemap.xml", async (req: Request, res: Response) => {
+    try {
+      const baseUrl = `${req.protocol}://${req.get("host")}` || "https://swissgainindia.com";
+      const products = await Product.find().sort({ updatedAt: -1 });
+      const categories = await Category.find().sort({ name: 1 });
+
+      const lastModToday = new Date().toISOString().split("T")[0];
+
+      // Standard static pages
+      const staticPages = [
+        { loc: "/", changefreq: "daily", priority: "1.0" },
+        { loc: "/products", changefreq: "daily", priority: "0.9" },
+        { loc: "/affiliate", changefreq: "weekly", priority: "0.7" },
+        { loc: "/refer-earn", changefreq: "weekly", priority: "0.7" },
+        { loc: "/contact", changefreq: "monthly", priority: "0.5" },
+        { loc: "/privacy-policy", changefreq: "monthly", priority: "0.5" },
+        { loc: "/termsandconditions", changefreq: "monthly", priority: "0.5" },
+        { loc: "/refundandcancellation", changefreq: "monthly", priority: "0.5" },
+      ];
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+      // 1. Add static pages
+      staticPages.forEach((page) => {
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}${page.loc}</loc>\n`;
+        xml += `    <lastmod>${lastModToday}</lastmod>\n`;
+        xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
+        xml += `    <priority>${page.priority}</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      // 2. Add category pages
+      categories.forEach((category) => {
+        const catLastMod = (category as any).updatedAt
+          ? new Date((category as any).updatedAt).toISOString().split("T")[0]
+          : lastModToday;
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/products?category=${category.slug}</loc>\n`;
+        xml += `    <lastmod>${catLastMod}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      // 3. Add dynamic product pages
+      products.forEach((product) => {
+        const prodLastMod = (product as any).updatedAt
+          ? new Date((product as any).updatedAt).toISOString().split("T")[0]
+          : lastModToday;
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/product/${product._id}</loc>\n`;
+        xml += `    <lastmod>${prodLastMod}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      xml += `</urlset>`;
+
+      res.header("Content-Type", "application/xml");
+      res.status(200).send(xml);
+    } catch (error) {
+      console.error("Sitemap generation error:", error);
+      res.status(500).send("Error generating sitemap");
+    }
+  });
+
   app.use("/api", router);
 
   return new Promise<any>((resolve) => {

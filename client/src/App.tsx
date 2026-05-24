@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Switch, Route, useLocation } from "wouter";
+import { HelmetProvider } from "react-helmet-async";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -128,21 +129,23 @@ function App() {
   }, [location]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="min-h-screen flex flex-col">
-          {/* Show header/footer only on non-admin routes */}
-          {!isAdminRoute && <Header />}
-          
-          <main className="flex-1">
-            <Router />
-          </main>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <div className="min-h-screen flex flex-col">
+            {/* Show header/footer only on non-admin routes */}
+            {!isAdminRoute && <Header />}
+            
+            <main className="flex-1">
+              <Router />
+            </main>
 
-          {!isAdminRoute && <Footer />}
-        </div>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+            {!isAdminRoute && <Footer />}
+          </div>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </HelmetProvider>
   );
 }
 
