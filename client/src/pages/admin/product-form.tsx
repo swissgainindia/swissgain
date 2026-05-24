@@ -53,7 +53,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         price: product.price?.toString() || "",
         originalPrice: product.originalPrice?.toString() || "",
         discount: product.discount?.toString() || "",
-        category: product.category || "",
+        category: typeof product.category === 'object' ? (product.category.slug || product.category._id || "") : (product.category || ""),
         image: product.image || "",
         images: Array.isArray(product.images) ? product.images.join(", ") : (product.images || ""),
         features: Array.isArray(product.features) ? product.features.join(", ") : (product.features || ""),
@@ -223,7 +223,11 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
           
           <div className="space-y-2">
             <Label htmlFor="category">Category *</Label>
-            <Select value={formData.category} onValueChange={(value) => handleChange("category", value)}>
+            <Select 
+              key={categories.length + '-' + formData.category}
+              value={formData.category} 
+              onValueChange={(value) => handleChange("category", value)}
+            >
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
                 {categories.length > 0 ? categories.map((cat) => (
