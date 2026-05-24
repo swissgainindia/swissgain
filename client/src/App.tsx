@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { useEffect, useRef } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -59,8 +60,72 @@ function Router() {
 }
 
 function App() {
-  const { pathname } = window.location;
-  const isAdminRoute = pathname.startsWith("/admin-");
+  const [location] = useLocation();
+  const isAdminRoute = location.startsWith("/admin-");
+  const isFirstMount = useRef(true);
+  const isRestoring = useRef(false);
+
+  // 1. Scroll listener to record scroll positions
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!isRestoring.current) {
+        sessionStorage.setItem("prevScrollPosition", window.scrollY.toString());
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // 2. Intelligent scroll restoration on page reload vs navigation
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+
+      // Handle Hard Refresh Scroll Restoration
+      const savedScroll = sessionStorage.getItem("prevScrollPosition");
+      const targetScroll = savedScroll ? parseInt(savedScroll, 10) : 0;
+
+      if (targetScroll > 0) {
+        isRestoring.current = true;
+        if ("scrollRestoration" in window.history) {
+          window.history.scrollRestoration = "manual";
+        }
+
+        let attempts = 0;
+        const restoreScroll = () => {
+          const currentHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+          const viewportHeight = window.innerHeight;
+
+          // Wait until the layout expands enough to safely scroll to the target spot
+          if (currentHeight >= targetScroll + viewportHeight || attempts > 30) {
+            window.scrollTo(0, targetScroll);
+            setTimeout(() => {
+              isRestoring.current = false;
+              if ("scrollRestoration" in window.history) {
+                window.history.scrollRestoration = "auto";
+              }
+            }, 100);
+            return true;
+          }
+          return false;
+        };
+
+        // Try immediately or poll until height stabilizes
+        if (!restoreScroll()) {
+          const interval = setInterval(() => {
+            attempts++;
+            if (restoreScroll() || attempts > 30) {
+              clearInterval(interval);
+            }
+          }, 100);
+        }
+      }
+    } else {
+      // Handle Active Route Navigation
+      window.scrollTo(0, 0);
+      sessionStorage.setItem("prevScrollPosition", "0");
+    }
+  }, [location]);
 
   return (
     <QueryClientProvider client={queryClient}>
