@@ -33,7 +33,7 @@ export default function NecklaceEcommerceHeader() {
   const isProductsPage = location.startsWith('/products');
 
   // Simulated live gold rates
-  const [goldRates, setGoldRates] = useState({ '24K': 7250.00, '22K': 6645.00 });
+  const [goldRates, setGoldRates] = useState({ '24K': 15719.00, '22K': 14410.00 });
   useEffect(() => {
     if (!isProductsPage) return;
     const interval = setInterval(() => {
