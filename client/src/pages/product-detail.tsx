@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import VirtualTryOnModal from '@/components/layout/virtual-try-on-modal';
 import { useRoute, Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -807,6 +808,7 @@ export default function ProductDetail() {
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isTryOnOpen, setIsTryOnOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   
   // Hooks
@@ -1192,6 +1194,16 @@ export default function ProductDetail() {
                   <Zap className="mr-2 h-5 w-5" /> Buy Now
                 </Button>
               </div>
+
+              {/* VIRTUAL TRY-ON CTA */}
+              <Button
+                variant="outline"
+                onClick={() => setIsTryOnOpen(true)}
+                className="w-full border-2 border-[#b45309] text-[#b45309] hover:bg-[#b45309]/5 hover:text-[#92400e] font-bold py-3 mt-2 rounded-xl flex items-center justify-center gap-1.5 active:scale-98 transition-transform"
+                size="lg"
+              >
+                ✨ Virtual AR Try-On
+              </Button>
               
               {!isInStock && (
                 <Badge variant="secondary" className="w-full py-3 justify-center">
@@ -1399,6 +1411,15 @@ export default function ProductDetail() {
           images={product.images}
           currentIndex={selectedImageIndex}
         />
+
+        {product && (
+          <VirtualTryOnModal
+            isOpen={isTryOnOpen}
+            onClose={() => setIsTryOnOpen(false)}
+            productName={product.name}
+            productImage={product.images[0]}
+          />
+        )}
       </div>
     </div>
   );
