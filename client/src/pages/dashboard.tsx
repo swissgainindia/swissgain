@@ -29,7 +29,8 @@ import {
   X,
   CreditCard,
   Headphones,
-  FileText
+  FileText,
+  Video
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
@@ -50,6 +51,7 @@ import { SidebarItem } from './components/SidebarItem'
 import PaymentRequest from './components/BankDetailsPage';
 import UserSupportCenter from './components/UserSupportCenter';
 import Orders from './Order';
+import { DashboardReelsContent } from './components/DashboardReelsContent';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfjwMO98DIl9XhoAbtWZbLUej1WtCa15k",
@@ -1089,6 +1091,8 @@ export default function Dashboard() {
         return <UserSupportCenter  />; 
       case 'orders':
         return <Orders />;
+      case 'product-reels':
+        return <DashboardReelsContent userId={userId} />;
       default:
         return <OverviewContent
           data={{ membership: { isAffiliate: dashboardUserData.isAffiliate, rank: userData?.rank || 1 } }}
@@ -1229,6 +1233,16 @@ export default function Dashboard() {
               }}
               collapsed={false}
             />
+            <SidebarItem
+              icon={<Video className="h-4 w-4" />}
+              label="Product Reels"
+              active={activeTab === 'product-reels'}
+              onClick={() => {
+                setActiveTab('product-reels');
+                setMobileMenuOpen(false);
+              }}
+              collapsed={false}
+            />
             {/* <SidebarItem
               icon={<FileText className="h-4 w-4" />}
               label="Reports"
@@ -1349,6 +1363,13 @@ export default function Dashboard() {
               label="Orders"
               active={activeTab === 'orders'}
               onClick={() => setActiveTab('orders')}
+              collapsed={sidebarCollapsed}
+            />
+            <SidebarItem
+              icon={<Video className="h-4 w-4" />}
+              label="Product Reels"
+              active={activeTab === 'product-reels'}
+              onClick={() => setActiveTab('product-reels')}
               collapsed={sidebarCollapsed}
             />
             {/* <SidebarItem

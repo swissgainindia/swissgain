@@ -115,6 +115,8 @@ interface OrderData {
   razorpaySignature?: string;
   commissionProcessed: boolean;
   creditedUplines?: Record<string, boolean>;
+  isGiftWrapped?: boolean;
+  giftMessage?: string;
 }
 
 // Customer ID Helpers
@@ -439,6 +441,8 @@ interface CartCheckoutModalProps {
   uid?: string;
   onOrderSuccess: () => void;
   razorpayLoaded: boolean;
+  isGiftWrapped: boolean;
+  giftMessage: string;
 }
 
 function CartCheckoutModal({ 
@@ -449,7 +453,9 @@ function CartCheckoutModal({
   customerId, 
   uid, 
   onOrderSuccess,
-  razorpayLoaded: externalRazorpayLoaded 
+  razorpayLoaded: externalRazorpayLoaded,
+  isGiftWrapped,
+  giftMessage
 }: CartCheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -459,7 +465,8 @@ function CartCheckoutModal({
     name: "", email: "", phone: "", address: "", city: "", state: "", pincode: ""
   });
   
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalAmount = subtotal + (isGiftWrapped ? 149 : 0);
   const orderDescription = `Cart Purchase (${cartItems.length} items)`;
 
   useEffect(() => {
@@ -661,6 +668,8 @@ function CartCheckoutModal({
         paymentStatus: 'pending', // will change after payment
         status: 'pending',
         createdAt: new Date().toISOString(),
+        isGiftWrapped,
+        giftMessage: isGiftWrapped ? giftMessage : "",
       };
       // 🔥 Directly open Razorpay
       await initiateRazorpayPayment(orderData);
@@ -708,8 +717,14 @@ function CartCheckoutModal({
             <div className="border-t pt-2 sm:pt-3">
               <div className="flex justify-between text-xs sm:text-sm mb-1">
                 <span>Subtotal:</span>
-                <span>₹{totalAmount.toLocaleString()}</span>
+                <span>₹{subtotal.toLocaleString()}</span>
               </div>
+              {isGiftWrapped && (
+                <div className="flex justify-between text-xs sm:text-sm mb-1 text-amber-600 font-medium">
+                  <span>🎁 Premium Velvet Wrapping:</span>
+                  <span>₹149</span>
+                </div>
+              )}
               <div className="flex justify-between text-xs sm:text-sm mb-1">
                 <span>Shipping:</span>
                 <span className="text-green-600">FREE</span>
@@ -894,6 +909,8 @@ export default function Cart() {
   const { data, updateData } = useLocalStorage();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [isGiftWrapped, setIsGiftWrapped] = useState(false);
+  const [giftMessage, setGiftMessage] = useState("");
   
   const affiliateId = getAffiliateIdFromUrl();
   const uid = getCookie('swissgain_uid') || undefined;
@@ -927,8 +944,10 @@ export default function Cart() {
     handleClearCart();
   };
 
+  const itemsSubtotal = data.cart.reduce((total, item) => total + item.price * item.quantity, 0);
+
   const getTotalPrice = () => {
-    return data.cart.reduce((total, item) => total + item.price * item.quantity, 0);
+    return itemsSubtotal + (isGiftWrapped ? 149 : 0);
   };
 
   const getTotalItems = () => {
@@ -1060,12 +1079,60 @@ export default function Cart() {
                 <div className="space-y-1.5 sm:space-y-2">
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span>Subtotal ({getTotalItems()} items)</span>
-                    <span>₹{getTotalPrice().toLocaleString()}</span>
+                    <span>₹{itemsSubtotal.toLocaleString()}</span>
                   </div>
+                  {isGiftWrapped && (
+                    <div className="flex justify-between text-xs sm:text-sm text-amber-600 font-medium">
+                      <span>🎁 Premium Velvet Box</span>
+                      <span>₹149</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span>Shipping</span>
                     <span className="text-green-600">FREE</span>
                   </div>
+                </div>
+
+                {/* Premium Gifting Upsell */}
+                <div className="border-t border-border pt-4 pb-2 space-y-3">
+                  <div 
+                    className="flex items-start space-x-3 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 transition-colors cursor-pointer"
+                    onClick={() => setIsGiftWrapped(!isGiftWrapped)}
+                  >
+                    <input 
+                      type="checkbox" 
+                      id="giftWrap" 
+                      checked={isGiftWrapped}
+                      onChange={(e) => setIsGiftWrapped(e.target.checked)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 h-4 w-4 rounded border-amber-500/50 text-amber-600 focus:ring-amber-500/50 cursor-pointer"
+                    />
+                    <div className="flex-1 text-left">
+                      <label htmlFor="giftWrap" className="font-semibold text-xs sm:text-sm text-foreground flex items-center gap-1 cursor-pointer">
+                        🎁 Add Velvet Box & Note
+                      </label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Premium velvet jewelry box & custom message card. (+ ₹149)
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {isGiftWrapped && (
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <label className="text-[11px] font-semibold text-muted-foreground block text-left">Personalized Gift Message</label>
+                      <textarea
+                        value={giftMessage}
+                        onChange={(e) => setGiftMessage(e.target.value)}
+                        placeholder="Write your custom gift message here..."
+                        maxLength={250}
+                        rows={3}
+                        className="w-full text-xs rounded-lg border border-border p-2 bg-background focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all"
+                      />
+                      <span className="text-[10px] text-muted-foreground block text-right">
+                        {250 - giftMessage.length} characters left
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-border pt-3 sm:pt-4">
@@ -1078,7 +1145,7 @@ export default function Cart() {
                 <div className="space-y-2 sm:space-y-3">
                   <Button
                     onClick={handleCheckoutClick}
-                    className="w-full gradient-gold text-accent-foreground py-2.5 sm:py-3 text-sm sm:text-base"
+                    className="w-full gradient-gold text-accent-foreground py-2.5 sm:py-3 text-sm sm:text-base font-semibold"
                     disabled={!razorpayLoaded}
                   >
                     {razorpayLoaded ? 'Proceed to Checkout' : 'Loading Payment...'}
@@ -1114,6 +1181,8 @@ export default function Cart() {
         uid={uid}
         onOrderSuccess={handleOrderSuccess}
         razorpayLoaded={razorpayLoaded}
+        isGiftWrapped={isGiftWrapped}
+        giftMessage={giftMessage}
       />
     </div>
   );

@@ -58,3 +58,47 @@ export interface CheckoutForm {
   phone: string;
   address: string;
 }
+
+export interface Reel {
+  id?: string;
+  _id?: string;
+  videoUrl: string;
+  productId: string | { _id: string; name: string; price: number; image: string };
+  userId?: string | { _id: string; username: string };
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt?: string;
+}
+
+export interface Order {
+  id?: string;
+  _id?: string;
+  orderNumber: string;
+  userId?: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  items: {
+    productId: string;
+    productName: string;
+    productImage?: string;
+    quantity: number;
+    price: number;
+  }[];
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  paymentMethod?: string;
+  paymentStatus?: 'pending' | 'paid' | 'failed';
+  isGiftWrapped?: boolean;
+  giftMessage?: string;
+  orderDate?: string;
+}

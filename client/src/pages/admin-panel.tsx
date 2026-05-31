@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { 
   LayoutDashboard, Package, FolderTree, ShoppingBag, 
-  Users, LogOut, Settings, Star 
+  Users, LogOut, Settings, Star, Film 
 } from "lucide-react"; // Added Star icon
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import BannerManager from "./admin/BannerManager";
 import AddUser from "./admin/AddUser";
 import CreateOrders from "./admin/CreateOrders";
 import AdminReviews from "./admin/reviews"; // IMPORT ADDED
+import AdminReels from "./admin/reels";
 
 // Import shared Firebase
 import { database } from "@/lib/firebase";
@@ -145,6 +146,7 @@ export default function AdminPanel() {
           users: true, referusers: true, paymentrequest: true,
           adminsupportcenter: true, role: true, banner: true,
           reviews: true, // ADDED PERMISSION
+          reels: true,
           adduser: true, createorders: true
         }
       };
@@ -340,6 +342,7 @@ export default function AdminPanel() {
     { id: "categories", label: "Categories", icon: FolderTree },
     { id: "orders", label: "Orders", icon: ShoppingBag },
     { id: "reviews", label: "Reviews", icon: Star }, // ADDED MENU ITEM
+    { id: "reels", label: "Shoppable Reels", icon: Film },
     { id: "users", label: "Affiliate Users", icon: Users },
     { id: "referusers", label: "Refer User", icon: Users },
     { id: "paymentrequest", label: "Payment Request", icon: Users },
@@ -372,6 +375,7 @@ export default function AdminPanel() {
       case "categories": return <AdminCategories />;
       case "orders": return <AdminOrders />;
       case "reviews": return <AdminReviews />; // ADDED CASE
+      case "reels": return <AdminReels />;
       case "users": return <AdminUsers />;
       case "referusers": return <AdminReferUser />;
       case "paymentrequest": return <AdminPaymentRequest />;

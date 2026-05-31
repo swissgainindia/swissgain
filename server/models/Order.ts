@@ -29,6 +29,8 @@ export interface IOrder extends Document {
   };
   paymentMethod?: string;
   paymentStatus?: 'pending' | 'paid' | 'failed';
+  isGiftWrapped?: boolean;
+  giftMessage?: string;
   orderDate: Date;
 }
 
@@ -67,6 +69,8 @@ const OrderSchema: Schema = new Schema({
     enum: ['pending', 'paid', 'failed'],
     default: 'pending'
   },
+  isGiftWrapped: { type: Boolean, default: false },
+  giftMessage: { type: String },
   orderDate: { type: Date, default: Date.now }
 }, { timestamps: true });
 

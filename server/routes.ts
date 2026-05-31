@@ -4,10 +4,12 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from "cloudinary"; // Naya Cloudinary Import
+import mongoose from "mongoose";
 import User from "./models/User";
 import Product from "./models/Product";
 import Category from "./models/Category";
 import Order from "./models/Order";
+import Reel from "./models/Reel";
 
 // Cloudinary Configuration (Yahan apni actual keys daalein ya .env use karein)
 cloudinary.config({
@@ -305,6 +307,99 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error("Sitemap generation error:", error);
       res.status(500).send("Error generating sitemap");
+    }
+  });
+
+  // ===== SHOPPABLE REELS =====
+  router.get("/reels", async (_req, res) => {
+    try {
+      const reels = await Reel.find({ status: "approved" })
+        .populate("productId")
+        .populate({ path: "userId", select: "username email" })
+        .sort({ createdAt: -1 });
+      res.json(reels);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  router.get("/admin/reels", authMiddleware, adminMiddleware, async (_req, res) => {
+    try {
+      const reels = await Reel.find()
+        .populate("productId")
+        .populate({ path: "userId", select: "username email" })
+        .sort({ createdAt: -1 });
+      res.json(reels);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  router.post("/reels", async (req, res) => {
+    try {
+      const { videoUrl, productId, userId, isAdmin } = req.body;
+      const reel = new Reel({
+        videoUrl,
+        productId,
+        userId: userId || null,
+        status: isAdmin ? "approved" : "pending"
+      });
+      await reel.save();
+      res.status(201).json(reel);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  router.put("/admin/reels/:id/status", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const { status } = req.body;
+      const reel = await Reel.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        { new: true }
+      );
+      if (!reel) return res.status(404).json({ message: "Reel not found" });
+      res.json(reel);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  router.delete("/admin/reels/:id", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const reel = await Reel.findByIdAndDelete(req.params.id);
+      if (!reel) return res.status(404).json({ message: "Reel not found" });
+      res.json({ message: "Reel deleted successfully" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ===== DIGITAL WARRANTY =====
+  router.get("/warranty/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      let order = null;
+      if (mongoose.Types.ObjectId.isValid(orderId)) {
+        order = await Order.findById(orderId);
+      }
+      if (!order) {
+        order = await Order.findOne({ orderNumber: orderId });
+      }
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      if (!order.items || order.items.length === 0) {
+        return res.status(400).json({ message: "Order contains no products" });
+      }
+      
+      res.json(order);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 

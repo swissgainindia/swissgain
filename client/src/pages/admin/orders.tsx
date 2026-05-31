@@ -87,6 +87,8 @@ interface Order {
   category: string;
   discount?: number;
   commission?: number;
+  isGiftWrapped?: boolean;
+  giftMessage?: string;
 }
 
 export default function AdminOrders() {
@@ -145,7 +147,9 @@ export default function AdminOrders() {
               images: value.images || [],
               category: value.category || "Unknown",
               discount: value.discount,
-              commission: value.commission || 0
+              commission: value.commission || 0,
+              isGiftWrapped: value.isGiftWrapped || false,
+              giftMessage: value.giftMessage || ''
             });
           });
 
@@ -792,6 +796,25 @@ export default function AdminOrders() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Premium Gifting Details */}
+              {selectedOrder.isGiftWrapped && (
+                <Card className="border-amber-500 bg-amber-50/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-amber-700 text-sm flex items-center gap-1.5 font-bold">
+                      🎁 Premium Velvet Gift Wrapped
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1.5 pb-4">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Personalized Message to Print:
+                    </p>
+                    <div className="bg-white border border-amber-200 p-3 rounded-lg text-xs italic text-stone-700 font-mono whitespace-pre-wrap">
+                      {selectedOrder.giftMessage || "No message provided."}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Affiliate Information */}
               {selectedOrder.affiliateId && (

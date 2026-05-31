@@ -31,6 +31,8 @@ import AffiliateSales from "./pages/AffilliateSales";
 import TestReferralEarnings from "./pages/admin/TestReferralEarnings";
 import ThankYouPage from "./pages/thankyou";
 import Order from "./pages/Order";
+import Reels from "@/pages/reels";
+import Warranty from "@/pages/warranty";
 
 function Router() {
   return (
@@ -53,6 +55,8 @@ function Router() {
       <Route path="/cart" component={Cart} />
       <Route path="/contact" component={Contact} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/reels" component={Reels} />
+      <Route path="/warranty" component={Warranty} />
       {/* Direct admin panel route */}
       <Route path="/admin-panel" component={AdminPanel} />
       
