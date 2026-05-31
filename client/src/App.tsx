@@ -12,7 +12,6 @@ import FomoTicker from "@/components/layout/fomo-ticker";
 import AiStylistChatbot from "@/components/layout/ai-stylist-chatbot";
 import Home from "@/pages/home";
 import Products from "@/pages/products";
-import Customize from "@/pages/customize";
 
 import ProductDetail from "@/pages/product-detail";
 import Affiliate from "@/pages/affiliate";
@@ -45,7 +44,6 @@ function Router() {
       <Route path="/AffiliateProduct" component={AffiliateProduct} />
       <Route path="/" component={Home} />
       <Route path="/products" component={Products} />
-      <Route path="/customize" component={Customize} />
       <Route path="/product/:id" component={ProductDetail} />
       
       <Route path="/affiliate" component={Affiliate} />

@@ -20,7 +20,6 @@ import WhiteLogo from '@/images/LOGO_white.png';
 const navigation = [
   { name: 'Home', href: '/' },
   { name: 'Products', href: '/products' },
-  { name: 'Design Lab', href: '/customize' },
   { name: 'Affiliate Program', href: '/affiliate' },
   { name: 'Refer & Earn', href: '/refer-earn' },
 ];
