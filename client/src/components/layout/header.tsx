@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Menu, X } from 'lucide-react';
 import {
   useAuth,
   findUserByCredentials,
@@ -26,6 +27,23 @@ const navigation = [
 export default function NecklaceEcommerceHeader() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Determine if we are on the Products page
+  const isProductsPage = location.startsWith('/products');
+
+  // Simulated live gold rates
+  const [goldRates, setGoldRates] = useState({ '24K': 7250.00, '22K': 6645.00 });
+  useEffect(() => {
+    if (!isProductsPage) return;
+    const interval = setInterval(() => {
+      setGoldRates(prev => ({
+        '24K': prev['24K'] + (Math.random() > 0.5 ? 1 : -1) * parseFloat((Math.random() * 2).toFixed(2)),
+        '22K': prev['22K'] + (Math.random() > 0.5 ? 1 : -1) * parseFloat((Math.random() * 1.5).toFixed(2)),
+      }));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isProductsPage]);
 
   /* ✅ DYNAMIC THEME LOGIC */
   const isHomePage = location === '/';
@@ -165,157 +183,273 @@ export default function NecklaceEcommerceHeader() {
   };
 
   return (
-    <header className="bg-transparent z-10 transition-colors duration-300">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          
-          {/* Logo Section - DYNAMIC LOGO & SIZE */}
-          <div className="flex items-center shrink-0">
-            <img 
-              src={currentLogo} 
-              alt="Swissgain" 
-              width={logoSize} 
-              height={logoSize} 
-              className="object-contain transition-all duration-300" 
-            />
-          </div>
-
-          {/* Navigation - DYNAMIC TEXT COLOR */}
-          <nav className="hidden md:flex flex-wrap justify-center space-x-8 mx-auto">
-            {navigation.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                onClick={item.name === 'Dashboard' ? handleDashboardClick : undefined}
-                className={`${textColorClass} font-medium text-lg transition-colors ${location === item.href ? 'underline decoration-2 underline-offset-4' : ''}`}
-              >
-                {item.name}
-              </a>
-            ))}
-          </nav>
-
-          {/* Search - HIDDEN */}
-          <div className="hidden flex-1 max-w-xl mx-6 relative"> 
-             {/* Search Code preserved but hidden */}
-          </div>
-
-          {/* Right Icons - DYNAMIC TEXT COLOR */}
-          <div className="flex items-center space-x-8 relative shrink-0">
-            {/* Account */}
-            <div className="relative">
-              <button
-                onClick={() => setIsAccountOpen(!isAccountOpen)}
-                className={`${textColorClass} flex flex-col items-center transition-colors`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span className="text-sm mt-1 hidden sm:block font-medium">
-                  {isLoggedIn ? (userData?.name || 'Account') : 'Account'}
-                </span>
-              </button>
-
-              {isAccountOpen && (
-                <div className="absolute top-full right-0 mt-3 w-48 bg-white shadow-xl rounded-md border border-gray-100 z-50">
-                  {isLoggedIn ? (
-                    <>
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-900">{userData?.name || 'User'}</p>
-                        <p className="text-xs text-gray-500 truncate">{userData?.email}</p>
-                        {isAffiliate && (
-                          <Badge variant="secondary" className="mt-1 text-xs">Affiliate</Badge>
-                        )}
-                      </div>
-                      <a href="#" onClick={handleDashboardClick} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Dashboard</a>
-                      <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Logout</button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsAccountOpen(false);
-                          setShowLoginModal(true);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Login
-                      </button>
-                      <Link href="/affiliate" onClick={() => setIsAccountOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                        Register
-                      </Link>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Cart */}
-            <Link href="/cart" className={`${textColorClass} flex flex-col items-center transition-colors`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-              <span className="text-sm mt-1 hidden sm:block font-medium">Cart</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* LOGIN MODAL */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-xl font-bold mb-4 text-gray-900">Login to Dashboard</h3>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="login-username">Username *</Label>
-                <Input
-                  id="login-username"
-                  name="username"
-                  type="text"
-                  placeholder="your username"
-                  value={loginCreds.username}
-                  onChange={handleLoginChange}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="login-password">Password *</Label>
-                <Input
-                  id="login-password"
-                  name="password"
-                  type="password"
-                  placeholder="your password"
-                  value={loginCreds.password}
-                  onChange={handleLoginChange}
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowLoginModal(false);
-                  setLoginCreds({ username: '', password: '' });
-                }}
-                disabled={loginLoading}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleLogin} disabled={loginLoading}>
-                {loginLoading ? 'Checking...' : 'Login'}
-              </Button>
-            </div>
-            <p className="text-xs text-center mt-4 text-gray-500">
-              Not registered?{" "}
-              <Link href="/affiliate" onClick={() => setShowLoginModal(false)} className="text-blue-600 font-semibold hover:underline">
-                Join now
-              </Link>
-            </p>
+    <>
+      {/* MOBILE EXCLUSIVE LIVE GOLD TICKER (Only visible on /products on mobile) */}
+      {isProductsPage && (
+        <div className="block md:hidden bg-gradient-to-r from-amber-950 via-[#300708] to-amber-950 text-amber-100 text-xs py-1.5 overflow-hidden border-b border-amber-800/30">
+          <div className="whitespace-nowrap flex items-center justify-center gap-6 animate-pulse">
+            <span className="flex items-center gap-1.5 font-bold">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping inline-block"></span>
+              <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block absolute"></span>
+              LIVE GOLD:
+            </span>
+            <span className="font-semibold text-amber-200">24K: ₹{goldRates['24K'].toFixed(2)}/g</span>
+            <span className="text-amber-500">|</span>
+            <span className="font-semibold text-amber-200">22K: ₹{goldRates['22K'].toFixed(2)}/g</span>
+            <span className="text-amber-500">|</span>
+            <span className="italic text-[10px] text-amber-300">100% Certified 1 Gram Plated</span>
           </div>
         </div>
       )}
-    </header>
+
+      <header className="bg-transparent z-10 transition-colors duration-300">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            
+            {/* Logo Section - DYNAMIC LOGO & SIZE */}
+            <div className="flex items-center shrink-0">
+              <img 
+                src={currentLogo} 
+                alt="Swissgain" 
+                width={logoSize} 
+                height={logoSize} 
+                className="object-contain transition-all duration-300" 
+              />
+            </div>
+
+            {/* Navigation - DYNAMIC TEXT COLOR */}
+            <nav className="hidden md:flex flex-wrap justify-center space-x-8 mx-auto">
+              {navigation.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  onClick={item.name === 'Dashboard' ? handleDashboardClick : undefined}
+                  className={`${textColorClass} font-medium text-lg transition-colors ${location === item.href ? 'underline decoration-2 underline-offset-4' : ''}`}
+                >
+                  {item.name}
+                </a>
+              ))}
+            </nav>
+
+            {/* Search - HIDDEN */}
+            <div className="hidden flex-1 max-w-xl mx-6 relative"> 
+               {/* Search Code preserved but hidden */}
+            </div>
+
+            {/* Right Icons - DYNAMIC TEXT COLOR */}
+            <div className="flex items-center space-x-4 md:space-x-8 relative shrink-0">
+              {/* Account */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsAccountOpen(!isAccountOpen)}
+                  className={`${textColorClass} flex flex-col items-center transition-colors`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="text-sm mt-1 hidden sm:block font-medium">
+                    {isLoggedIn ? (userData?.name || 'Account') : 'Account'}
+                  </span>
+                </button>
+
+                {isAccountOpen && (
+                  <div className="absolute top-full right-0 mt-3 w-48 bg-white shadow-xl rounded-md border border-gray-100 z-50">
+                    {isLoggedIn ? (
+                      <>
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900">{userData?.name || 'User'}</p>
+                          <p className="text-xs text-gray-500 truncate">{userData?.email}</p>
+                          {isAffiliate && (
+                            <Badge variant="secondary" className="mt-1 text-xs">Affiliate</Badge>
+                          )}
+                        </div>
+                        <a href="#" onClick={handleDashboardClick} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Dashboard</a>
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Logout</button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setIsAccountOpen(false);
+                            setShowLoginModal(true);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Login
+                        </button>
+                        <Link href="/affiliate" onClick={() => setIsAccountOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                          Register
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Cart */}
+              <Link href="/cart" className={`${textColorClass} flex flex-col items-center transition-colors`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <span className="text-sm mt-1 hidden sm:block font-medium">Cart</span>
+              </Link>
+
+              {/* Mobile Hamburger Button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className={`${textColorClass} block md:hidden p-1.5 focus:outline-none transition-colors`}
+                aria-label="Toggle mobile menu"
+              >
+                <Menu className="h-7 w-7" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* LOGIN MODAL */}
+        {showLoginModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl">
+              <h3 className="text-xl font-bold mb-4 text-gray-900">Login to Dashboard</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="login-username">Username *</Label>
+                  <Input
+                    id="login-username"
+                    name="username"
+                    type="text"
+                    placeholder="your username"
+                    value={loginCreds.username}
+                    onChange={handleLoginChange}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="login-password">Password *</Label>
+                  <Input
+                    id="login-password"
+                    name="password"
+                    type="password"
+                    placeholder="your password"
+                    value={loginCreds.password}
+                    onChange={handleLoginChange}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowLoginModal(false);
+                    setLoginCreds({ username: '', password: '' });
+                  }}
+                  disabled={loginLoading}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleLogin} disabled={loginLoading}>
+                  {loginLoading ? 'Checking...' : 'Login'}
+                </Button>
+              </div>
+              <p className="text-xs text-center mt-4 text-gray-500">
+                Not registered?{" "}
+                <Link href="/affiliate" onClick={() => setShowLoginModal(false)} className="text-blue-600 font-semibold hover:underline">
+                  Join now
+                </Link>
+              </p>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* MOBILE NAV DRAWER */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          ></div>
+          
+          {/* Drawer content */}
+          <div className="relative flex flex-col w-4/5 max-w-sm h-full bg-gradient-to-b from-[#300708] to-amber-950 text-white p-6 shadow-2xl z-10 transition-transform duration-300 transform translate-x-0 border-r border-amber-800/20">
+            {/* Close button */}
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-amber-800/30">
+              <img 
+                src={WhiteLogo} 
+                alt="Swissgain" 
+                width={100}
+                className="object-contain"
+              />
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-amber-100"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Navigation links */}
+            <nav className="flex flex-col space-y-6 flex-1">
+              {navigation.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  onClick={(e) => {
+                    setIsMobileMenuOpen(false);
+                    if (item.name === 'Dashboard') {
+                      handleDashboardClick(e);
+                    }
+                  }}
+                  className={`text-xl font-semibold tracking-wide transition-colors ${
+                    location === item.href 
+                      ? 'text-amber-400 font-bold border-l-4 border-amber-500 pl-3' 
+                      : 'text-amber-100 hover:text-amber-300 pl-3'
+                  }`}
+                >
+                  {item.name}
+                </a>
+              ))}
+            </nav>
+
+            {/* Bottom Account & Cart Info inside mobile menu */}
+            <div className="pt-6 border-t border-amber-800/30 space-y-4">
+              <div className="flex items-center justify-between">
+                {isLoggedIn ? (
+                  <div className="flex flex-col">
+                    <span className="text-xs text-amber-300">Logged in as</span>
+                    <span className="font-medium text-white">{userData?.name || 'Affiliate User'}</span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-amber-200">Welcome Guest</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button 
+                  onClick={(e) => {
+                    setIsMobileMenuOpen(false);
+                    if (isLoggedIn) {
+                      setLocation('/dashboard');
+                    } else {
+                      setShowLoginModal(true);
+                    }
+                  }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-md border-0"
+                >
+                  {isLoggedIn ? 'Dashboard' : 'Login'}
+                </Button>
+                <Link href="/cart" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button variant="outline" className="w-full border-amber-800 text-amber-200 hover:bg-white/10 hover:text-amber-100">
+                    Cart
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

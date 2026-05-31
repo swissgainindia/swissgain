@@ -7,6 +7,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import WelcomeCouponModal from "@/components/layout/welcome-coupon-modal";
+import FomoTicker from "@/components/layout/fomo-ticker";
 import Home from "@/pages/home";
 import Products from "@/pages/products";
 
@@ -141,6 +143,13 @@ function App() {
             </main>
 
             {!isAdminRoute && <Footer />}
+
+            {!isAdminRoute && (
+              <>
+                <WelcomeCouponModal />
+                <FomoTicker />
+              </>
+            )}
           </div>
           <Toaster />
         </TooltipProvider>

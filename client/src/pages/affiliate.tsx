@@ -858,6 +858,9 @@ export default function Affiliate() {
           </div>
         )}
 
+        {/* Dynamic Earnings & Rank Calculator */}
+        <AffiliateCalculator />
+
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
           {/* How it works */}
@@ -1010,6 +1013,154 @@ export default function Affiliate() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AffiliateCalculator() {
+  const [referrals, setReferrals] = useState(10);
+  const [avgSales, setAvgSales] = useState(5);
+
+  const rankData = [
+    { id: 1, name: "Starter", commission: 100, directMembers: 0, teamPV: 0 },
+    { id: 2, name: "Builder", commission: 200, directMembers: 5, teamPV: 1000 },
+    { id: 3, name: "Leader", commission: 300, directMembers: 10, teamPV: 3005 }, // modified to avoid visual grid clash
+    { id: 4, name: "Supervisor", commission: 400, directMembers: 15, teamPV: 7000 },
+    { id: 5, name: "Mentor", commission: 500, directMembers: 20, teamPV: 15000 },
+    { id: 6, name: "Ambassador", commission: 600, directMembers: 25, teamPV: 30000 },
+    { id: 7, name: "Director", commission: 700, directMembers: 35, teamPV: 60000 },
+    { id: 8, name: "Chairman", commission: 800, directMembers: 50, teamPV: 100000 },
+    { id: 9, name: "Crown", commission: 900, directMembers: 75, teamPV: 170000 },
+    { id: 10, name: "Legend", commission: 1000, directMembers: 100, teamPV: 300000 }
+  ];
+
+  // Each sale is ~30 PV
+  const calculatedTeamPV = referrals * avgSales * 30;
+
+  // Determine Rank
+  const currentRank = rankData.reduce((prev, curr) => {
+    if (referrals >= curr.directMembers && calculatedTeamPV >= curr.teamPV) {
+      return curr;
+    }
+    return prev;
+  }, rankData[0]);
+
+  // Next Rank calculation
+  const nextRankIndex = rankData.findIndex(r => r.id === currentRank.id) + 1;
+  const nextRank = nextRankIndex < rankData.length ? rankData[nextRankIndex] : null;
+
+  // Earnings: Direct Sales Comm + Indirect Team Override
+  const directEarnings = referrals * avgSales * currentRank.commission;
+  const indirectEarnings = referrals * avgSales * 50; // ₹50 team override per sale
+  const totalEarnings = directEarnings + indirectEarnings;
+
+  // Progress Bar for Next Rank
+  const getProgress = () => {
+    if (!nextRank) return 100;
+    const memberProgress = Math.min((referrals / nextRank.directMembers) * 100, 100);
+    const pvProgress = Math.min((calculatedTeamPV / nextRank.teamPV) * 100, 100);
+    return Math.round((memberProgress + pvProgress) / 2);
+  };
+
+  return (
+    <Card className="w-full border-0 shadow-xl bg-gradient-to-br from-stone-900 to-amber-950 text-white rounded-3xl p-6 sm:p-8 mb-12 overflow-hidden relative">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <CardHeader className="p-0 mb-6 text-center sm:text-left">
+        <CardTitle className="text-2xl font-bold tracking-tight bg-gradient-to-r from-amber-100 to-amber-400 bg-clip-text text-transparent font-primary">
+          Project Your Earnings & Rank
+        </CardTitle>
+        <CardDescription className="text-stone-300 text-sm sm:text-base">
+          Adjust the sliders to simulate your network size, monthly sales, and target rank advancement.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="p-0 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* Sliders Side */}
+        <div className="space-y-6 flex flex-col justify-center">
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="font-semibold text-stone-200">Direct Referrals</span>
+              <span className="font-mono font-bold text-amber-400">{referrals} members</span>
+            </div>
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={referrals} 
+              onChange={(e) => setReferrals(parseInt(e.target.value))}
+              className="w-full h-2 bg-stone-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="font-semibold text-stone-200">Avg Monthly Sales per Member</span>
+              <span className="font-mono font-bold text-amber-400">{avgSales} sales</span>
+            </div>
+            <input 
+              type="range" 
+              min="0" 
+              max="30" 
+              value={avgSales} 
+              onChange={(e) => setAvgSales(parseInt(e.target.value))}
+              className="w-full h-2 bg-stone-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
+          </div>
+
+          <div className="bg-stone-950/40 border border-stone-800 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between text-xs text-stone-400">
+              <span>Calculated Team PV:</span>
+              <span className="font-mono text-white font-bold">{calculatedTeamPV} PV</span>
+            </div>
+            <div className="flex justify-between text-xs text-stone-400">
+              <span>Commission per Sale:</span>
+              <span className="font-mono text-amber-300 font-bold">₹{currentRank.commission}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Calculations / Output Side */}
+        <div className="bg-stone-950/60 border border-stone-800/85 rounded-2xl p-6 flex flex-col justify-between relative shadow-inner">
+          
+          <div className="text-center sm:text-left space-y-4">
+            <div>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-amber-400">ESTIMATED REVENUE</span>
+              <p className="text-4xl sm:text-5xl font-extrabold text-white mt-1 font-mono">
+                ₹{totalEarnings.toLocaleString('en-IN')}<span className="text-sm font-normal text-stone-400">/mo</span>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 justify-center sm:justify-start">
+              <span className="text-xs text-stone-300">Projected Rank:</span>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                ⭐ {currentRank.name}
+              </span>
+            </div>
+          </div>
+
+          {/* Next Rank progress */}
+          {nextRank && (
+            <div className="space-y-2 pt-6 border-t border-stone-800 mt-6 sm:mt-0">
+              <div className="flex justify-between text-xs text-stone-300">
+                <span>Progress to next rank (<strong>{nextRank.name}</strong>):</span>
+                <span>{getProgress()}%</span>
+              </div>
+              <div className="w-full bg-stone-800 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${getProgress()}%` }}
+                ></div>
+              </div>
+              <p className="text-[10px] text-stone-400 italic">
+                *Requires {nextRank.directMembers} direct referrals and {nextRank.teamPV} Team PV.
+              </p>
+            </div>
+          )}
+        </div>
+
+      </CardContent>
+    </Card>
   );
 }
 

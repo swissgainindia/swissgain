@@ -1,4 +1,5 @@
-import { Link } from 'wouter';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/product-card';
 import SEO from '@/components/layout/seo';
@@ -16,6 +17,18 @@ import HeroSection from './heroSection';
 import FeaturedProductsSection from './FeaturedProductsSection'
 
 export default function Home() {
+  const [_, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      const hasRedirected = sessionStorage.getItem('hasRedirectedMobile');
+      if (!hasRedirected) {
+        sessionStorage.setItem('hasRedirectedMobile', 'true');
+        setLocation('/products');
+      }
+    }
+  }, [setLocation]);
+
   return (
     <div>
       <SEO 
