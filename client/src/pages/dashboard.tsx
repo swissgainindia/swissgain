@@ -589,7 +589,22 @@ export default function Dashboard() {
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const [firebaseData, setFirebaseData] = useState({
+  const [firebaseData, setFirebaseData] = useState<{
+    affiliateEarnings: any[];
+    referralEarnings: any[];
+    billingHistory: any[];
+    reports: any[];
+    affiliateLinks: any[];
+    referralLinks: any[];
+    affiliateStats: {
+      totalSales: number;
+      affiliateEarnings: number;
+      referralEarnings: number;
+      totalEarnings: number;
+      totalReferrals: number;
+    };
+    affiliateData: any;
+  }>({
     affiliateEarnings: [],
     referralEarnings: [],
     billingHistory: [],
@@ -760,19 +775,19 @@ export default function Dashboard() {
 
     // Cleanup function
     return () => {
-      unsubscribeAffiliateEarnings();
-      unsubscribeReferralEarnings();
-      unsubscribeAffiliateLinks();
-      unsubscribeReferralLinks();
-      unsubscribeBillingHistory();
-      unsubscribeAffiliateStats();
-      unsubscribeAffiliateData();
+      unsubscribeAffiliateEarnings?.();
+      unsubscribeReferralEarnings?.();
+      unsubscribeAffiliateLinks?.();
+      unsubscribeReferralLinks?.();
+      unsubscribeBillingHistory?.();
+      unsubscribeAffiliateStats?.();
+      unsubscribeAffiliateData?.();
     };
   }, [userId, isLoggedIn, hasPurchased]);
 
   const calculateROI = () => {
     const totalEarnings = firebaseData.affiliateStats.affiliateEarnings + firebaseData.affiliateStats.referralEarnings;
-    const investment = 999; // Fixed affiliate registration fee
+    const investment: number = 999; // Fixed affiliate registration fee
     if (investment === 0) return 0;
     return Math.round(((totalEarnings - investment) / investment) * 100);
   };
@@ -1070,13 +1085,7 @@ export default function Dashboard() {
       case 'payment-request':
         return <PaymentRequest />;
       case 'referral-earnings':
-        return <ReferralEarningsContent
-          data={{ membership: { isAffiliate: dashboardUserData.isAffiliate } }}
-          referralEarnings={firebaseData.referralEarnings}
-          referralLinks={firebaseData.referralLinks}
-          handleSimulateReferral={handleSimulateReferral}
-          onGenerateLink={() => setShowReferralLinkDialog(true)}
-        />;
+        return <ReferralEarningsContent />;
       case 'profile':
         return <ProfileContent
           userData={dashboardUserData}
@@ -1084,7 +1093,7 @@ export default function Dashboard() {
           updateData={() => { }}
         />;
       case 'billing':
-        return <BillingContent billingHistory={firebaseData.billingHistory} />;
+        return <BillingContent affiliateStats={firebaseData.affiliateStats} />;
       // case 'reports':
       //   return <ReportsContent reports={firebaseData.reports} />;
       case 'support-center':

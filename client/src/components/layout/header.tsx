@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,6 @@ import WhiteLogo from '@/images/LOGO_white.png';
 const navigation = [
   { name: 'Home', href: '/' },
   { name: 'Products', href: '/products' },
-  { name: 'Reels', href: '/reels' },
-  { name: 'Warranty Portal', href: '/warranty' },
   { name: 'Affiliate Program', href: '/affiliate' },
   { name: 'Refer & Earn', href: '/refer-earn' },
 ];
@@ -30,12 +28,25 @@ export default function NecklaceEcommerceHeader() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
   
   // Determine if we are on the Products page
   const isProductsPage = location.startsWith('/products');
 
   // Simulated live gold rates
   const [goldRates, setGoldRates] = useState({ '24K': 15719.00, '22K': 14410.00 });
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setIsAccountOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   useEffect(() => {
     if (!isProductsPage) return;
     const interval = setInterval(() => {
@@ -241,7 +252,7 @@ export default function NecklaceEcommerceHeader() {
             {/* Right Icons - DYNAMIC TEXT COLOR */}
             <div className="flex items-center space-x-4 md:space-x-8 relative shrink-0">
               {/* Account */}
-              <div className="relative">
+              <div className="relative" ref={accountRef}>
                 <button
                   onClick={() => setIsAccountOpen(!isAccountOpen)}
                   className={`${textColorClass} flex flex-col items-center transition-colors`}

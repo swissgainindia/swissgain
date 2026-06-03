@@ -387,6 +387,14 @@ body {
   scrollbar-gutter: stable;
 }
 
+/* Forcefully hide Shadow DOM media controls to prevent play/pause flash on load */
+video::-webkit-media-controls {
+  display: none !important;
+}
+video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
 /* Optional: Show scrollbar only on hover */
 /* .sidebar-scroll:hover::-webkit-scrollbar-thumb {
   background-color: rgba(156, 163, 175, 0.5);

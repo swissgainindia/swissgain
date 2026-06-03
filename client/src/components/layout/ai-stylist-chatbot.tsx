@@ -141,10 +141,10 @@ export default function AiStylistChatbot() {
 
       {/* Glassmorphic Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-18 right-4 z-50 w-[320px] sm:w-[350px] h-[450px] bg-stone-950/90 backdrop-blur-xl border border-stone-850 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 transform translate-y-0 scale-100 bg-gradient-to-b from-stone-900/30 to-stone-950/80">
+        <div className="fixed bottom-18 right-4 z-50 w-[320px] sm:w-[350px] h-[450px] bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 transform translate-y-0 scale-100">
           
           {/* Header */}
-          <div className="bg-stone-900/80 border-b border-stone-850 p-4 flex items-center justify-between">
+          <div className="bg-black/20 border-b border-white/10 p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20 text-amber-400">
                 <Sparkles className="h-4.5 w-4.5" />
@@ -228,14 +228,14 @@ export default function AiStylistChatbot() {
               e.preventDefault();
               handleSendMessage(inputVal);
             }}
-            className="border-t border-stone-850 p-3 bg-stone-900/60 flex items-center gap-2"
+            className="border-t border-white/10 p-3 bg-black/20 flex items-center gap-2"
           >
             <input
               type="text"
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               placeholder="Ask your luxury stylist..."
-              className="flex-1 bg-stone-950 border border-stone-850/80 focus:border-amber-500 focus:ring-0 rounded-xl py-2 px-3.5 text-xs text-stone-200 placeholder-stone-500 outline-none transition-colors"
+              className="flex-1 bg-black/40 border border-white/10 focus:border-amber-500 focus:ring-0 rounded-xl py-2 px-3.5 text-xs text-stone-200 placeholder-stone-500 outline-none transition-colors"
             />
             <button
               type="submit"

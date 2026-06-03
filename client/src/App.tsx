@@ -70,6 +70,7 @@ function Router() {
 function App() {
   const [location] = useLocation();
   const isAdminRoute = location.startsWith("/admin-");
+  const isReelsPage = location === "/reels";
   const isFirstMount = useRef(true);
   const isRestoring = useRef(false);
 
@@ -88,7 +89,7 @@ function App() {
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
-
+ 
       // Handle Hard Refresh Scroll Restoration
       const savedScroll = sessionStorage.getItem("prevScrollPosition");
       const targetScroll = savedScroll ? parseInt(savedScroll, 10) : 0;
@@ -140,14 +141,14 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <div className="min-h-screen flex flex-col">
-            {/* Show header/footer only on non-admin routes */}
-            {!isAdminRoute && <Header />}
+            {/* Show header/footer only on non-admin/non-reels routes */}
+            {!isAdminRoute && !isReelsPage && <Header />}
             
             <main className="flex-1">
               <Router />
             </main>
 
-            {!isAdminRoute && <Footer />}
+            {!isAdminRoute && !isReelsPage && <Footer />}
 
             {!isAdminRoute && (
               <>

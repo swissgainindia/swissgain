@@ -29,14 +29,24 @@ export default function ReferEarn() {
   ];
   const totalCommission = 24.4; // ✅ FIXED: Corrected from 34.4% to actual sum 24.4%
   const totalAmount = "₹731.76"; // ✅ FIXED: Corrected calculation
-  const handleGenerateLink = () => {
-    const newLink = generateReferralLink();
-    setReferralLink(newLink);
-    updateData(data => ({ ...data, referralLink: newLink }));
-    toast({
-      title: "Referral Link Generated!",
-      description: "Your unique referral link has been created.",
-    });
+  const handleGenerateLink = async () => {
+    try {
+      const result = await generateReferralLink();
+      const newLink = result.url;
+      setReferralLink(newLink);
+      updateData(data => ({ ...data, referralLink: newLink }));
+      toast({
+        title: "Referral Link Generated!",
+        description: "Your unique referral link has been created.",
+      });
+    } catch (err) {
+      console.error("Failed to generate referral link", err);
+      toast({
+        title: "Error",
+        description: "Failed to generate referral link. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   const handleCopyLink = async () => {
     if (!referralLink) {

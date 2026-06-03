@@ -59,6 +59,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               muted
               playsInline
               preload="none"
+              controls={false}
               className="absolute inset-0 w-full h-full object-cover z-10"
             />
           )}

@@ -52,7 +52,7 @@ const Ticker: React.FC = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .top-header {
           overflow: hidden;
           white-space: nowrap;
@@ -96,7 +96,7 @@ const Ticker: React.FC = () => {
             transform: translateX(-50%);
           }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 };

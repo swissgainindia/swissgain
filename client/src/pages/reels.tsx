@@ -183,7 +183,7 @@ export default function ReelsPage() {
         category: product.category
       };
       
-      updateData(addProductToCart.bind(null, cleanProduct));
+      updateData(addProductToCart.bind(null, cleanProduct, 1));
       toast({
         title: "Added to Cart 🎁",
         description: `${product.name} has been added to your shopping cart.`,
@@ -247,8 +247,8 @@ export default function ReelsPage() {
   }
 
   return (
-    <div className="flex justify-center bg-black min-h-[calc(100vh-80px)] md:py-6 overflow-hidden">
-      <div className="w-full max-w-[450px] relative h-[calc(100vh-80px)] md:h-[800px] md:rounded-3xl md:overflow-hidden md:border-8 md:border-neutral-900 bg-neutral-950 shadow-2xl flex flex-col justify-center">
+    <div className="flex justify-center bg-black min-h-[100dvh] md:py-6 overflow-hidden">
+      <div className="w-full max-w-[450px] relative h-[100dvh] md:h-[800px] md:rounded-3xl md:overflow-hidden md:border-8 md:border-neutral-900 bg-neutral-950 shadow-2xl flex flex-col justify-center">
         {/* Floating Mute Button */}
         <button 
           onClick={handleToggleMute}
@@ -278,6 +278,7 @@ export default function ReelsPage() {
                   loop
                   muted={isMuted}
                   playsInline
+                  controls={false}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
 

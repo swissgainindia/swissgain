@@ -99,6 +99,16 @@ export default function Footer() {
                     Refer & Earn
                   </Link>
                 </li>
+                <li>
+                  <Link href="/reels" className="hover:text-accent transition-colors">
+                    Reels
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/warranty" className="hover:text-accent transition-colors">
+                    Warranty Portal
+                  </Link>
+                </li>
               </ul>
             </div>
 

@@ -76,6 +76,7 @@ const HeroSection = () => {
               muted
               loop
               playsInline
+              controls={false}
               className="w-full h-full object-cover pointer-events-none"
             />
             <div className="absolute inset-0 bg-black/30 z-10"></div>
