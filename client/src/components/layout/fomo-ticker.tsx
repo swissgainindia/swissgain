@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ShoppingBag, X } from 'lucide-react';
+import { useLocation } from 'wouter';
 
 const fomoPurchases = [
   { name: 'Ananya', city: 'Mumbai', product: 'Swiss Gold Chain', image: 'chains' },
@@ -15,8 +16,11 @@ const fomoPurchases = [
 ];
 
 export default function FomoTicker() {
+  const [location] = useLocation();
   const [currentPurchase, setCurrentPurchase] = useState<typeof fomoPurchases[0] | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+
+  if (location === '/reels') return null;
 
   useEffect(() => {
     // Show first alert after 10 seconds

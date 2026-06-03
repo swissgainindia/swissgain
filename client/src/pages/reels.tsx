@@ -8,10 +8,11 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 import { addProductToCart } from '@/lib/storage';
 import { 
   Heart, Share2, Volume2, VolumeX, ShoppingCart, 
-  Play, Pause, ChevronDown, Award, Sparkles, MessageSquare 
+  Play, Pause, ChevronDown, Award, Sparkles, MessageSquare, X 
 } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'wouter';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Product {
   _id: string;
@@ -76,6 +77,22 @@ const MOCKUP_REELS = [
   }
 ];
 
+const MOCK_REVIEWS: Record<string, { author: string; text: string; date: string }[]> = {
+  "mock-1": [
+    { author: "Aditya R.", text: "The gold finish is so premium, looks like real 24k gold. Highly recommended!", date: "2 days ago" },
+    { author: "Sneha M.", text: "Beautiful design! I wear it every day and it hasn't tarnished at all.", date: "1 week ago" },
+    { author: "Rohan S.", text: "Excellent customer service and fast delivery. Very satisfied.", date: "2 weeks ago" }
+  ],
+  "mock-2": [
+    { author: "Vikram K.", text: "Stunning solitaire! The shine is incredible under sunlight.", date: "3 days ago" },
+    { author: "Priya P.", text: "Proposed to my fiance with this and she absolutely loved it!", date: "5 days ago" }
+  ],
+  "mock-3": [
+    { author: "Neha G.", text: "The floral details are so intricate. Got so many compliments!", date: "1 day ago" },
+    { author: "Amit B.", text: "Bought this set for my mother, she was thrilled. Great packaging too.", date: "4 days ago" }
+  ]
+};
+
 export default function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +104,34 @@ export default function ReelsPage() {
   const { updateData } = useLocalStorage();
   const { toast } = useToast();
 
+  // Double-tap & click-handling states
+  const [doubleTappedReels, setDoubleTappedReels] = useState<Record<string, boolean>>({});
+  const clickTimeoutRefs = useRef<Record<string, NodeJS.Timeout | null>>({});
+
+  // Reviews/Comments Bottom Sheet state
+  const [isReviewsOpen, setIsReviewsOpen] = useState(false);
+  const [activeReelForReviews, setActiveReelForReviews] = useState<string | null>(null);
+  const [newReviewText, setNewReviewText] = useState('');
+  const [reviews, setReviews] = useState<Record<string, { author: string; text: string; date: string }[]>>(() => {
+    const saved = localStorage.getItem('swissgain_reels_reviews');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return MOCK_REVIEWS;
+  });
+
   useEffect(() => {
     fetchReels();
+    return () => {
+      // Clean up click timeouts on unmount
+      Object.values(clickTimeoutRefs.current).forEach(timeout => {
+        if (timeout) clearTimeout(timeout);
+      });
+    };
   }, []);
 
   const fetchReels = async () => {
@@ -212,19 +255,73 @@ export default function ReelsPage() {
     });
   };
 
-  const handleShare = (reel: Reel, e: React.MouseEvent) => {
+  const handleShare = async (reel: Reel, e: React.MouseEvent) => {
     e.stopPropagation();
     const shareUrl = `${window.location.origin}/product/${reel.productId._id}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast({
-      title: "Link Copied!",
-      description: "Product detail link copied to clipboard.",
-    });
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'SwissGain India - Premium Jewelry',
+          text: 'Check out this amazing gold-plated jewelry I found on SwissGain!',
+          url: shareUrl
+        });
+      } catch (err) {
+        console.log("Error sharing:", err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link Copied!",
+          description: "Product detail link copied to clipboard.",
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
   const handleToggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsMuted(!isMuted);
+  };
+
+  const handleDoubleTap = (reelId: string, e: React.MouseEvent) => {
+    // Trigger sidebar like toggle logic
+    handleToggleLike(reelId, e);
+    
+    // Show heart animation
+    setDoubleTappedReels(prev => ({ ...prev, [reelId]: true }));
+    setTimeout(() => {
+      setDoubleTappedReels(prev => {
+        const next = { ...prev };
+        delete next[reelId];
+        return next;
+      });
+    }, 1000);
+  };
+
+  const handleVideoClick = (reelId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (e.detail === 2) {
+      // Double tap!
+      if (clickTimeoutRefs.current[reelId]) {
+        clearTimeout(clickTimeoutRefs.current[reelId]!);
+        clickTimeoutRefs.current[reelId] = null;
+      }
+      handleDoubleTap(reelId, e);
+    } else {
+      // Single tap (wait 250ms for potential double tap)
+      if (clickTimeoutRefs.current[reelId]) {
+        clearTimeout(clickTimeoutRefs.current[reelId]!);
+      }
+      clickTimeoutRefs.current[reelId] = setTimeout(() => {
+        handleVideoTap(reelId);
+        clickTimeoutRefs.current[reelId] = null;
+      }, 250);
+    }
   };
 
   const handleVideoTap = (reelId: string) => {
@@ -235,6 +332,28 @@ export default function ReelsPage() {
     } else {
       video.pause();
     }
+  };
+
+  const handleAddReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReviewText.trim() || !activeReelForReviews) return;
+
+    const newComment = {
+      author: "You",
+      text: newReviewText.trim(),
+      date: "Just now"
+    };
+
+    setReviews(prev => {
+      const updated = {
+        ...prev,
+        [activeReelForReviews]: [newComment, ...(prev[activeReelForReviews] || [])]
+      };
+      localStorage.setItem('swissgain_reels_reviews', JSON.stringify(updated));
+      return updated;
+    });
+
+    setNewReviewText('');
   };
 
   if (loading) {
@@ -260,7 +379,7 @@ export default function ReelsPage() {
         {/* Snap-Scrolling Reels Container */}
         <div 
           ref={containerRef}
-          className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-none"
+          className="w-full h-[100dvh] md:h-full overflow-y-scroll snap-y snap-mandatory scrollbar-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {reels.map((reel, idx) => {
@@ -268,8 +387,8 @@ export default function ReelsPage() {
             return (
               <div 
                 key={reel._id} 
-                className="w-full h-full snap-start relative bg-neutral-900 cursor-pointer overflow-hidden flex flex-col justify-between"
-                onClick={() => handleVideoTap(reel._id)}
+                className="w-full h-[100dvh] md:h-full snap-start relative bg-neutral-900 cursor-pointer overflow-hidden flex flex-col justify-between shrink-0"
+                onClick={(e) => handleVideoClick(reel._id, e)}
               >
                 {/* Full-Screen Video Background */}
                 <video
@@ -281,6 +400,21 @@ export default function ReelsPage() {
                   controls={false}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
+
+                {/* Fading Double-Tap Heart Overlay */}
+                <AnimatePresence>
+                  {doubleTappedReels[reel._id] && (
+                    <motion.div
+                      initial={{ scale: 0.3, opacity: 0 }}
+                      animate={{ scale: [1, 1.2, 1], opacity: [0, 1, 1, 0] }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"
+                    >
+                      <Heart className="h-24 w-24 text-white fill-white drop-shadow-2xl" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Frosted overlay at the bottom for readability */}
                 <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
@@ -335,7 +469,11 @@ export default function ReelsPage() {
 
                   {/* Comment Button simulation */}
                   <button 
-                    onClick={(e) => { e.stopPropagation(); toast({ title: "Comments Closed", description: "Comments are disabled for review authenticity." }); }}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setActiveReelForReviews(reel._id);
+                      setIsReviewsOpen(true);
+                    }}
                     className="flex flex-col items-center"
                   >
                     <div className="p-3 rounded-full bg-black/40 border border-white/10 text-white hover:bg-black/60 transition-colors">
@@ -380,6 +518,78 @@ export default function ReelsPage() {
             );
           })}
         </div>
+
+        {/* Reviews Bottom Sheet */}
+        {isReviewsOpen && activeReelForReviews && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex flex-col justify-end" onClick={() => setIsReviewsOpen(false)}>
+            <div 
+              className="w-full max-w-[450px] mx-auto bg-neutral-950 rounded-t-3xl border-t border-white/10 h-[60%] flex flex-col text-left transition-transform duration-300 transform translate-y-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header handle */}
+              <div className="flex justify-center py-2 shrink-0">
+                <div className="w-12 h-1 bg-neutral-700 rounded-full" />
+              </div>
+              
+              {/* Title & Close */}
+              <div className="px-4 pb-3 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="font-bold text-sm text-white">Review Comments</h3>
+                  <p className="text-[10px] text-neutral-400">Authentic Buyer Verified reviews</p>
+                </div>
+                <button 
+                  onClick={() => setIsReviewsOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-white/5 text-neutral-400 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Comments Scroll Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {(reviews[activeReelForReviews] || []).length > 0 ? (
+                  (reviews[activeReelForReviews] || []).map((rev, index) => (
+                    <div key={index} className="flex gap-3">
+                      <div className="h-8 w-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center font-bold text-xs text-amber-400 flex-shrink-0">
+                        {rev.author.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-white">{rev.author}</span>
+                          <span className="text-[10px] text-neutral-500">{rev.date}</span>
+                        </div>
+                        <p className="text-xs text-neutral-300 leading-relaxed font-medium">{rev.text}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                    <MessageSquare className="h-8 w-8 mb-2 opacity-55" />
+                    <p className="text-xs">No reviews yet. Be the first to write one!</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Comment Input Form */}
+              <form onSubmit={handleAddReview} className="p-3 border-t border-white/5 bg-neutral-950 flex items-center gap-2 shrink-0">
+                <input 
+                  type="text"
+                  value={newReviewText}
+                  onChange={(e) => setNewReviewText(e.target.value)}
+                  placeholder="Add an authentic buyer review..."
+                  className="flex-1 bg-neutral-900 border border-white/5 focus:border-amber-500 focus:ring-0 rounded-xl py-2 px-3.5 text-xs text-white placeholder-neutral-500 outline-none"
+                />
+                <button 
+                  type="submit"
+                  disabled={!newReviewText.trim()}
+                  className="h-8 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs flex items-center justify-center disabled:opacity-50 transition-colors"
+                >
+                  Post
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
