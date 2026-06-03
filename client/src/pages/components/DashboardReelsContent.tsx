@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Video, Upload, AlertCircle, CheckCircle, Clock, XCircle, Film, Sparkles } from 'lucide-react';
+import { Video, Upload, AlertCircle, CheckCircle, Clock, XCircle, Film, Sparkles, Eye, Heart, Trash2 } from 'lucide-react';
 import axios from 'axios';
 
 interface Product {
@@ -70,6 +70,25 @@ export function DashboardReelsContent({ userId }: DashboardReelsContentProps) {
       console.error(err);
     } finally {
       setLoadingReels(false);
+    }
+  };
+
+  const handleDeleteReel = async (reelId: string) => {
+    if (!confirm("Are you sure you want to delete this reel permanently?")) return;
+    try {
+      await axios.delete(`/api/reels/${reelId}`, { data: { userId } });
+      toast({
+        title: "Reel Deleted 🎉",
+        description: "Your jewelry review has been successfully removed.",
+      });
+      fetchMyReels();
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Delete Failed",
+        description: err.response?.data?.message || "Something went wrong deleting your review.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -302,30 +321,43 @@ export function DashboardReelsContent({ userId }: DashboardReelsContentProps) {
               <ul className="space-y-3">
                 {myReels.map((reel) => (
                   <li key={reel._id} className="p-3 border rounded-xl bg-card hover:bg-muted/10 transition-colors flex items-center justify-between gap-3 text-xs">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-bold text-foreground truncate max-w-[130px]">
                         {reel.productId?.name || 'Review Video'}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {new Date(reel.createdAt).toLocaleDateString()}
-                      </p>
+                      <div className="flex gap-2 text-[10px] text-muted-foreground mt-1">
+                        <span>{new Date(reel.createdAt).toLocaleDateString()}</span>
+                        <span className="flex items-center gap-0.5"><Eye className="h-3 w-3 text-neutral-400" /> {(reel as any).views || 0}</span>
+                        <span className="flex items-center gap-0.5"><Heart className="h-3 w-3 text-rose-500/85 fill-rose-500/10" /> {(reel as any).likes || 0}</span>
+                      </div>
                     </div>
-                    <div>
-                      {reel.status === 'approved' && (
-                        <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20 hover:bg-emerald-500/10 flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" /> Live
-                        </Badge>
-                      )}
-                      {reel.status === 'pending' && (
-                        <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/10 flex items-center gap-1">
-                          <Clock className="h-3 w-3 animate-pulse" /> Pending
-                        </Badge>
-                      )}
-                      {reel.status === 'rejected' && (
-                        <Badge className="bg-rose-500/10 text-rose-700 border-rose-500/20 hover:bg-rose-500/10 flex items-center gap-1">
-                          <XCircle className="h-3 w-3" /> Rejected
-                        </Badge>
-                      )}
+                    <div className="flex items-center gap-1">
+                      <div>
+                        {reel.status === 'approved' && (
+                          <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/20 hover:bg-emerald-500/10 flex items-center gap-1 text-[10px] py-0.5 px-1.5">
+                            <CheckCircle className="h-2.5 w-2.5" /> Live
+                          </Badge>
+                        )}
+                        {reel.status === 'pending' && (
+                          <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/10 flex items-center gap-1 text-[10px] py-0.5 px-1.5">
+                            <Clock className="h-2.5 w-2.5 animate-pulse" /> Pending
+                          </Badge>
+                        )}
+                        {reel.status === 'rejected' && (
+                          <Badge className="bg-rose-500/10 text-rose-700 border-rose-500/20 hover:bg-rose-500/10 flex items-center gap-1 text-[10px] py-0.5 px-1.5">
+                            <XCircle className="h-2.5 w-2.5" /> Rejected
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteReel(reel._id)}
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-lg flex-shrink-0"
+                        title="Delete Reel"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </li>
                 ))}

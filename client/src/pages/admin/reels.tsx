@@ -177,7 +177,7 @@ export default function AdminReels() {
 
   const handleUpdateStatus = async (reelId: string, newStatus: 'approved' | 'rejected') => {
     try {
-      await axios.put(`/api/admin/reels/${reelId}/status`, { status: newStatus });
+      await axios.put(`/api/admin/reels/${reelId}`, { status: newStatus });
       toast({
         title: "Status Updated",
         description: `Review reel has been ${newStatus}.`,
@@ -188,6 +188,24 @@ export default function AdminReels() {
       toast({
         title: "Update Error",
         description: err.response?.data?.message || "Failed to update reel status.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateProduct = async (reelId: string, newProductId: string) => {
+    try {
+      await axios.put(`/api/admin/reels/${reelId}`, { productId: newProductId });
+      toast({
+        title: "Product Linked",
+        description: "Reel's linked product has been updated.",
+      });
+      fetchReels();
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Update Error",
+        description: err.response?.data?.message || "Failed to update linked product.",
         variant: "destructive"
       });
     }
@@ -303,11 +321,19 @@ export default function AdminReels() {
                         <img 
                           src={reel?.productId?.image || '/placeholder.png'} 
                           alt="" 
-                          className="w-10 h-10 object-cover rounded-lg border border-border"
+                          className="w-10 h-10 object-cover rounded-lg border border-border flex-shrink-0"
                         />
-                        <span className="truncate max-w-[120px] text-xs sm:text-sm font-bold">
-                          {reel?.productId?.name || 'Deleted Product'}
-                        </span>
+                        <select
+                          value={reel?.productId?._id || ''}
+                          onChange={(e) => handleUpdateProduct(reel._id, e.target.value)}
+                          className="text-xs bg-background border border-border hover:border-amber-500/30 rounded-lg p-1.5 outline-none focus:ring-1 focus:ring-amber-500 max-w-[160px] font-semibold truncate transition-colors cursor-pointer"
+                        >
+                          {products.map(p => (
+                            <option key={p._id} value={p._id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </TableCell>
                     <TableCell>

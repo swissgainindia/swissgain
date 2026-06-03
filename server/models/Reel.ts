@@ -5,6 +5,8 @@ export interface IReel extends Document {
   productId: mongoose.Types.ObjectId;
   userId?: mongoose.Types.ObjectId;
   status: 'pending' | 'approved' | 'rejected';
+  views: number;
+  likes: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,7 +19,9 @@ const ReelSchema: Schema = new Schema({
     type: String, 
     enum: ['pending', 'approved', 'rejected'], 
     default: 'pending' 
-  }
+  },
+  views: { type: Number, default: 0 },
+  likes: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // Check if model exists before compiling to prevent overwrite errors in development

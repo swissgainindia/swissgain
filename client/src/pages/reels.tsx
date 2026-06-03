@@ -13,6 +13,7 @@ import {
 import axios from 'axios';
 import { Link } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
+import BrandLogo from '@/images/LOGO_white.png';
 
 interface Product {
   _id: string;
@@ -26,8 +27,9 @@ interface Reel {
   _id: string;
   videoUrl: string;
   productId: Product;
-  userId?: { _id: string; username: string };
+  userId?: { _id: string; username: string; role?: string };
   status: 'pending' | 'approved' | 'rejected';
+  likes?: number;
   createdAt: string;
 }
 
@@ -160,7 +162,7 @@ export default function ReelsPage() {
       const initialLikes: Record<string, { count: number; userLiked: boolean }> = {};
       reels.forEach(reel => {
         initialLikes[reel._id] = {
-          count: Math.floor(Math.random() * 150) + 45,
+          count: reel.likes !== undefined && reel.likes !== null ? reel.likes : (Math.floor(Math.random() * 150) + 45),
           userLiked: false
         };
       });
@@ -384,6 +386,7 @@ export default function ReelsPage() {
         >
           {reels.map((reel, idx) => {
             const likeState = likes[reel._id] || { count: 0, userLiked: false };
+            const isAdminUpload = !reel.userId || reel.userId.role === 'admin';
             return (
               <div 
                 key={reel._id} 
@@ -422,17 +425,35 @@ export default function ReelsPage() {
                 {/* Left Floating Creators details overlay */}
                 <div className="absolute left-4 bottom-32 z-40 text-left max-w-[280px]">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-amber-600 to-yellow-500 border border-amber-400 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-md">
-                      {reel.userId?.username?.substring(0, 2) || 'SG'}
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm text-white drop-shadow-md">
-                        @{reel.userId?.username || 'SwissGain Curator'}
-                      </p>
-                      <p className="text-[10px] text-amber-300 font-semibold drop-shadow-md flex items-center gap-0.5">
-                        <Award className="h-3 w-3" /> Verified Buyer Review
-                      </p>
-                    </div>
+                    {isAdminUpload ? (
+                      <>
+                        <div className="h-9 w-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shadow-md p-1 overflow-hidden">
+                          <img src={BrandLogo} alt="SwissGain Logo" className="h-full w-full object-contain" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-white drop-shadow-md">
+                            SwissGain
+                          </p>
+                          <p className="text-[10px] text-amber-400 font-semibold drop-shadow-md flex items-center gap-0.5">
+                            <Sparkles className="h-3 w-3 text-amber-400" /> Official Brand Reel
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-amber-600 to-yellow-500 border border-amber-400 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-md">
+                          {reel.userId?.username?.substring(0, 2) || 'SG'}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-white drop-shadow-md">
+                            @{reel.userId?.username || 'SwissGain Curator'}
+                          </p>
+                          <p className="text-[10px] text-amber-300 font-semibold drop-shadow-md flex items-center gap-0.5">
+                            <Award className="h-3 w-3" /> Verified Buyer Review
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <p className="text-xs text-white/95 leading-relaxed font-medium drop-shadow-sm line-clamp-2">
                     Reviewing our amazing {reel.productId.name}. Gold finish is 100% genuine and stunning!

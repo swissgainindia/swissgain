@@ -315,7 +315,7 @@ export async function registerRoutes(app: Express) {
     try {
       const reels = await Reel.find({ status: "approved" })
         .populate("productId")
-        .populate({ path: "userId", select: "username email" })
+        .populate({ path: "userId", select: "username email role" })
         .sort({ createdAt: -1 });
       res.json(reels);
     } catch (err: any) {
@@ -327,7 +327,7 @@ export async function registerRoutes(app: Express) {
     try {
       const reels = await Reel.find()
         .populate("productId")
-        .populate({ path: "userId", select: "username email" })
+        .populate({ path: "userId", select: "username email role" })
         .sort({ createdAt: -1 });
       res.json(reels);
     } catch (err: any) {
@@ -338,11 +338,18 @@ export async function registerRoutes(app: Express) {
   router.post("/reels", async (req, res) => {
     try {
       const { videoUrl, productId, userId, isAdmin } = req.body;
+      
+      // Seed random views and likes for affiliates/users to show instantly on dashboard
+      const views = Math.floor(Math.random() * 401) + 100; // 100 to 500 views
+      const likes = Math.floor(Math.random() * 71) + 10;   // 10 to 80 likes
+
       const reel = new Reel({
         videoUrl,
         productId,
         userId: userId || null,
-        status: isAdmin ? "approved" : "pending"
+        status: isAdmin ? "approved" : "pending",
+        views,
+        likes
       });
       await reel.save();
       res.status(201).json(reel);
@@ -351,16 +358,39 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  router.put("/admin/reels/:id/status", authMiddleware, adminMiddleware, async (req, res) => {
+  router.put("/admin/reels/:id", authMiddleware, adminMiddleware, async (req, res) => {
     try {
-      const { status } = req.body;
+      const { status, productId } = req.body;
+      const updateData: any = {};
+      if (status !== undefined) updateData.status = status;
+      if (productId !== undefined) updateData.productId = productId;
+
       const reel = await Reel.findByIdAndUpdate(
         req.params.id,
-        { status },
+        updateData,
         { new: true }
-      );
+      ).populate("productId").populate({ path: "userId", select: "username email role" });
+      
       if (!reel) return res.status(404).json({ message: "Reel not found" });
       res.json(reel);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  router.delete("/reels/:id", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const reel = await Reel.findById(req.params.id);
+      if (!reel) return res.status(404).json({ message: "Reel not found" });
+      
+      // If the reel has an associated userId, verify ownership
+      if (reel.userId && reel.userId.toString() !== userId) {
+        return res.status(403).json({ message: "You are not authorized to delete this reel" });
+      }
+      
+      await Reel.findByIdAndDelete(req.params.id);
+      res.json({ message: "Reel deleted successfully" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -1244,7 +1244,7 @@ export default function Dashboard() {
             />
             <SidebarItem
               icon={<Video className="h-4 w-4" />}
-              label="Product Reels"
+              label="My Reels"
               active={activeTab === 'product-reels'}
               onClick={() => {
                 setActiveTab('product-reels');
@@ -1376,7 +1376,7 @@ export default function Dashboard() {
             />
             <SidebarItem
               icon={<Video className="h-4 w-4" />}
-              label="Product Reels"
+              label="My Reels"
               active={activeTab === 'product-reels'}
               onClick={() => setActiveTab('product-reels')}
               collapsed={sidebarCollapsed}
