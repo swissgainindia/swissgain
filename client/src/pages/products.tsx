@@ -87,6 +87,12 @@ export default function Products() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState('featured');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, sortBy]);
   
   // Store real-time review stats: { productId: { sum: 50, count: 10 } }
   const [reviewsMap, setReviewsMap] = useState<Record<string, { sum: number, count: number }>>({});
@@ -175,9 +181,9 @@ export default function Products() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        p.name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q)
       );
     }
 
@@ -195,6 +201,12 @@ export default function Products() {
 
     return filtered;
   }, [processedProducts, searchQuery, selectedCategory, sortBy]);
+
+  const pageSize = 12;
+  const totalPages = Math.ceil(filteredAndSortedProducts.length / pageSize);
+  const activePage = Math.min(currentPage, Math.max(1, totalPages));
+  const startIndex = (activePage - 1) * pageSize;
+  const paginatedProducts = filteredAndSortedProducts.slice(startIndex, startIndex + pageSize);
 
   if (loading) {
     return (
@@ -264,11 +276,101 @@ export default function Products() {
         </div>
 
         <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'space-y-4'}>
-          {filteredAndSortedProducts.map((product) => (
+          {paginatedProducts.map((product) => (
             //  This Card will now receive the combined rating and review count
             <ProductCard key={product._id} product={product} />
           ))}
         </div>
+
+        {/* Premium Public Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200 mt-8">
+            <p className="text-sm text-muted-foreground">
+              Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{" "}
+              <span className="font-semibold text-foreground">
+                {Math.min(startIndex + pageSize, filteredAndSortedProducts.length)}
+              </span>{" "}
+              of <span className="font-semibold text-foreground">{filteredAndSortedProducts.length}</span> products
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCurrentPage(1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={activePage === 1}
+                className="h-9 px-3 text-xs bg-white"
+              >
+                First
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCurrentPage((prev) => Math.max(1, prev - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={activePage === 1}
+                className="h-9 px-3 text-xs bg-white"
+              >
+                Previous
+              </Button>
+              
+              <div className="flex items-center gap-1.5 mx-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - activePage) <= 1)
+                  .map((page, idx, arr) => {
+                    const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                    return (
+                      <div key={page} className="flex items-center gap-1.5">
+                        {showEllipsis && <span className="text-muted-foreground text-xs px-1">...</span>}
+                        <Button
+                          variant={activePage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setCurrentPage(page);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className={`h-9 w-9 text-xs p-0 bg-white ${
+                            activePage === page ? "gradient-primary text-primary-foreground font-bold border-0" : ""
+                          }`}
+                        >
+                          {page}
+                        </Button>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={activePage === totalPages}
+                className="h-9 px-3 text-xs bg-white"
+              >
+                Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCurrentPage(totalPages);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={activePage === totalPages}
+                className="h-9 px-3 text-xs bg-white"
+              >
+                Last
+              </Button>
+            </div>
+          </div>
+        )}
 
         {filteredAndSortedProducts.length === 0 && (
           <div className="text-center py-16">

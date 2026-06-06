@@ -8,6 +8,14 @@ import { Link } from 'wouter';
 import { addProductToCart } from '@/lib/storage';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
+const getOptimizedImageUrl = (url: string, width: number = 400) => {
+  if (!url) return '';
+  if (url.includes('res.cloudinary.com')) {
+    return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
+  }
+  return url;
+};
+
 interface ProductCardProps {
   product: Product;
 }
@@ -77,7 +85,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
 
           <img
-            src={product.image}
+            src={getOptimizedImageUrl(product.image, 400)}
             alt={product.name}
             loading="lazy"
             decoding="async"
