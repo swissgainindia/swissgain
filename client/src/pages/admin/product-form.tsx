@@ -90,7 +90,17 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
   };
 
   const handleChange = (field: string, value: any) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      // Auto-generate slug from name if we are creating a new product
+      if (field === "name" && !product) {
+        updated.slug = value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)+/g, "");
+      }
+      return updated;
+    });
   };
 
   const handleRatingChange = (value: string) => {
@@ -230,9 +240,13 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
             >
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
-                {categories.length > 0 ? categories.map((cat) => (
-                  <SelectItem key={cat._id} value={cat.slug}>{cat.name}</SelectItem>
-                )) : <div className="px-4 py-2 text-gray-400">No categories found</div>}
+                {categories.length > 0 ? (
+                  categories.map((cat) => (
+                    <SelectItem key={cat._id} value={cat.slug}>{cat.name}</SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>No categories found</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

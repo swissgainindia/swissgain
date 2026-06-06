@@ -99,7 +99,7 @@ export async function registerRoutes(app: Express) {
 
       const operations = products.map((item: { id: string; sortOrder: number }) => ({
         updateOne: {
-          filter: { _id: item.id },
+          filter: { _id: mongoose.Types.ObjectId.isValid(item.id) ? new mongoose.Types.ObjectId(item.id) : item.id },
           update: { $set: { sortOrder: item.sortOrder } }
         }
       }));
