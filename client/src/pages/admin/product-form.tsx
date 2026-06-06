@@ -46,9 +46,14 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
   // ✅ FIX: Update form data when 'product' prop changes
   useEffect(() => {
     if (product) {
+      const generatedSlug = product.slug || (product.name ? product.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "") : "");
+
       setFormData({
         name: product.name || "",
-        slug: product.slug || "",
+        slug: generatedSlug,
         description: product.description || "",
         price: product.price?.toString() || "",
         originalPrice: product.originalPrice?.toString() || "",
@@ -92,8 +97,8 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
   const handleChange = (field: string, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      // Auto-generate slug from name if we are creating a new product
-      if (field === "name" && !product) {
+      // Auto-generate slug from name if we are creating a new product or slug is currently empty
+      if (field === "name" && (!product || !prev.slug)) {
         updated.slug = value
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
