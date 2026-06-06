@@ -67,7 +67,18 @@ function SortableRow({ product, handleEdit, handleDelete }: SortableRowProps) {
           className="w-12 h-12 object-cover rounded"
         />
       </TableCell>
-      <TableCell className="font-medium">{product.name}</TableCell>
+      <TableCell 
+        className="font-medium"
+        style={{ 
+          maxWidth: "280px", 
+          whiteSpace: "nowrap", 
+          overflow: "hidden", 
+          textOverflow: "ellipsis" 
+        }}
+        title={product.name}
+      >
+        {product.name}
+      </TableCell>
       <TableCell>{product.category}</TableCell>
       <TableCell>₹{product.price}</TableCell>
       <TableCell>{isInStock ? "In Stock" : "Out of Stock"}</TableCell>
@@ -98,7 +109,14 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
+
+  const pageSize = 20;
+  const totalPages = Math.ceil(products.length / pageSize);
+  const activePage = Math.min(currentPage, Math.max(1, totalPages));
+  const startIndex = (activePage - 1) * pageSize;
+  const paginatedProducts = products.slice(startIndex, startIndex + pageSize);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -226,10 +244,10 @@ export default function AdminProducts() {
             </TableHeader>
             <TableBody>
               <SortableContext
-                items={products.map((p) => p._id)}
+                items={paginatedProducts.map((p) => p._id)}
                 strategy={verticalListSortingStrategy}
               >
-                {products.map((product) => (
+                {paginatedProducts.map((product) => (
                   <SortableRow
                     key={product._id}
                     product={product}
@@ -242,6 +260,80 @@ export default function AdminProducts() {
           </Table>
         </DndContext>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border mt-4">
+          <p className="text-xs text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{" "}
+            <span className="font-semibold text-foreground">
+              {Math.min(startIndex + pageSize, products.length)}
+            </span>{" "}
+            of <span className="font-semibold text-foreground">{products.length}</span> products
+          </p>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(1)}
+              disabled={activePage === 1}
+              className="h-8 px-2 text-xs"
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={activePage === 1}
+              className="h-8 px-3 text-xs"
+            >
+              Previous
+            </Button>
+            
+            <div className="flex items-center gap-1 mx-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - activePage) <= 1)
+                .map((page, idx, arr) => {
+                  const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                  return (
+                    <div key={page} className="flex items-center gap-1">
+                      {showEllipsis && <span className="text-muted-foreground text-xs px-1">...</span>}
+                      <Button
+                        variant={activePage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={`h-8 w-8 text-xs p-0 ${
+                          activePage === page ? "gradient-gold text-accent-foreground font-bold" : ""
+                        }`}
+                      >
+                        {page}
+                      </Button>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={activePage === totalPages}
+              className="h-8 px-3 text-xs"
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={activePage === totalPages}
+              className="h-8 px-2 text-xs"
+            >
+              Last
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
