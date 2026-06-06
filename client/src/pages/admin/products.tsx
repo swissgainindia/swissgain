@@ -23,6 +23,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+const getOptimizedImageUrl = (url: string, width: number = 100) => {
+  if (!url) return '';
+  if (url.includes('res.cloudinary.com')) {
+    return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
+  }
+  return url;
+};
+
 interface SortableRowProps {
   product: any;
   handleEdit: (product: any) => void;
@@ -62,8 +70,10 @@ function SortableRow({ product, handleEdit, handleDelete }: SortableRowProps) {
       </TableCell>
       <TableCell>
         <img
-          src={product.image}
+          src={getOptimizedImageUrl(product.image, 100)}
           alt={product.name}
+          loading="lazy"
+          decoding="async"
           className="w-12 h-12 object-cover rounded"
         />
       </TableCell>
