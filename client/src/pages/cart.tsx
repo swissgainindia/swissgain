@@ -117,6 +117,8 @@ interface OrderData {
   creditedUplines?: Record<string, boolean>;
   isGiftWrapped?: boolean;
   giftMessage?: string;
+  discountAmount?: number;
+  couponCode?: string;
 }
 
 // Customer ID Helpers
@@ -173,6 +175,12 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
     if (cleanOrderData.originalCustomerId === undefined) {
       delete cleanOrderData.originalCustomerId;
     }
+    if (cleanOrderData.discountAmount === undefined) {
+      delete cleanOrderData.discountAmount;
+    }
+    if (cleanOrderData.couponCode === undefined) {
+      delete cleanOrderData.couponCode;
+    }
     // For items, clean each item's originalPrice if undefined
     cleanOrderData.items = cleanOrderData.items.map(item => {
       const cleanItem = { ...item };
@@ -195,6 +203,49 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
     };
    
     await set(newOrderRef, orderWithId);
+
+    // Save to Mongoose/MongoDB backend API as well
+    try {
+      await axios.post('/api/orders', {
+        orderNumber: orderWithId.uniqueOrderId,
+        userId: orderData.customerId?.startsWith('cust_') || orderData.customerId?.startsWith('purchase_') || orderData.customerId?.startsWith('guest_') ? undefined : orderData.customerId,
+        customerName: orderData.customerInfo.name,
+        customerEmail: orderData.customerInfo.email,
+        customerPhone: orderData.customerInfo.phone,
+        items: orderData.items.map(item => ({
+          productId: item.productId || item.id,
+          productName: item.name,
+          productImage: item.image || (item.images && item.images[0]) || '',
+          quantity: item.quantity,
+          price: item.price
+        })),
+        subtotal: orderData.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        shipping: 0,
+        tax: 0,
+        total: orderData.totalAmount,
+        status: 'pending',
+        shippingAddress: {
+          street: orderData.customerInfo.address,
+          city: orderData.customerInfo.city,
+          state: orderData.customerInfo.state,
+          zipCode: orderData.customerInfo.pincode,
+          country: 'India'
+        },
+        paymentMethod: 'razorpay',
+        paymentStatus: 'paid',
+        isGiftWrapped: orderData.isGiftWrapped || false,
+        giftMessage: orderData.giftMessage || '',
+        affiliateId: orderData.affiliateId || undefined,
+        guestContact: !orderData.customerId || orderData.customerId.startsWith('cust_') || orderData.customerId.startsWith('purchase_') || orderData.customerId.startsWith('guest_') ? {
+          name: orderData.customerInfo.name,
+          email: orderData.customerInfo.email,
+          phone: orderData.customerInfo.phone
+        } : undefined
+      });
+    } catch (apiErr) {
+      console.error('Failed to save order to backend API:', apiErr);
+    }
+
     return orderId;
   } catch (error) {
     console.error('Error saving order:', error);
@@ -443,6 +494,8 @@ interface CartCheckoutModalProps {
   razorpayLoaded: boolean;
   isGiftWrapped: boolean;
   giftMessage: string;
+  discountAmount?: number;
+  couponCode?: string;
 }
 
 function CartCheckoutModal({ 
@@ -455,7 +508,9 @@ function CartCheckoutModal({
   onOrderSuccess,
   razorpayLoaded: externalRazorpayLoaded,
   isGiftWrapped,
-  giftMessage
+  giftMessage,
+  discountAmount = 0,
+  couponCode
 }: CartCheckoutModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -466,7 +521,7 @@ function CartCheckoutModal({
   });
   
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const totalAmount = subtotal + (isGiftWrapped ? 149 : 0);
+  const totalAmount = Math.max(0, subtotal + (isGiftWrapped ? 149 : 0) - discountAmount);
   const orderDescription = `Cart Purchase (${cartItems.length} items)`;
 
   useEffect(() => {
@@ -670,6 +725,9 @@ function CartCheckoutModal({
         createdAt: new Date().toISOString(),
         isGiftWrapped,
         giftMessage: isGiftWrapped ? giftMessage : "",
+        commissionProcessed: false,
+        discountAmount,
+        couponCode
       };
       // 🔥 Directly open Razorpay
       await initiateRazorpayPayment(orderData);
@@ -898,23 +956,38 @@ function CartCheckoutModal({
 }
 
 // Get affiliate ID from URL (same as product detail)
-const getAffiliateIdFromUrl = () => 
-  typeof window !== 'undefined' 
-    ? new URLSearchParams(window.location.search).get('ref') || 
-      new URLSearchParams(window.location.search).get('affiliate') || 
-      undefined 
-    : undefined;
+// Get affiliate ID from URL (same as product detail) with local persistence fallback
+const getPersistedAffiliateId = () => {
+  if (typeof window === 'undefined') return undefined;
+  const urlParams = new URLSearchParams(window.location.search);
+  const refFromUrl = urlParams.get('ref') || urlParams.get('affiliate');
+  if (refFromUrl) return refFromUrl;
+  const refFromLocal = localStorage.getItem('swissgain_referral_id');
+  if (refFromLocal) return refFromLocal;
+  const m = document.cookie.match(/(^| )swissgain_referral_id=([^;]+)/);
+  return m ? m[2] : undefined;
+};
 
 export default function Cart() {
   const { data, updateData } = useLocalStorage();
+  const { toast } = useToast();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [isGiftWrapped, setIsGiftWrapped] = useState(false);
   const [giftMessage, setGiftMessage] = useState("");
   
-  const affiliateId = getAffiliateIdFromUrl();
+  const affiliateId = getPersistedAffiliateId();
   const uid = getCookie('swissgain_uid') || undefined;
   const customerId = uid || getOrCreateCustomerId();
+
+  // Coupon / Promo Code State
+  const [selectedCoupon, setSelectedCoupon] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const coupons = [
+    { code: "PREPAID10", discountPercent: 10, label: "10% OFF on Prepaid", description: "Save 10% on your prepaid order" },
+    { code: "WEDDING20", discountPercent: 20, label: "20% OFF on Wedding Sets", description: "Save 20% on orders above ₹4,999" }
+  ];
 
   // Load Razorpay script on component mount
   useEffect(() => {
@@ -946,8 +1019,39 @@ export default function Cart() {
 
   const itemsSubtotal = data.cart.reduce((total, item) => total + item.price * item.quantity, 0);
 
+  const getCouponDiscount = () => {
+    if (!selectedCoupon) return 0;
+    const coupon = coupons.find(c => c.code === selectedCoupon);
+    if (!coupon) return 0;
+    if (coupon.code === "WEDDING20" && itemsSubtotal < 4999) {
+      return 0;
+    }
+    return Math.round(itemsSubtotal * (coupon.discountPercent / 100));
+  };
+
+  const handleSelectCoupon = (code: string) => {
+    if (selectedCoupon === code) {
+      setSelectedCoupon(null);
+      setCouponError(null);
+      return;
+    }
+    
+    if (code === "WEDDING20" && itemsSubtotal < 4999) {
+      setCouponError("WEDDING20 requires a minimum order value of ₹4,999.");
+      setSelectedCoupon(null);
+      return;
+    }
+    
+    setSelectedCoupon(code);
+    setCouponError(null);
+    toast({
+      title: "Coupon Applied",
+      description: `Coupon ${code} applied successfully!`,
+    });
+  };
+
   const getTotalPrice = () => {
-    return itemsSubtotal + (isGiftWrapped ? 149 : 0);
+    return Math.max(0, itemsSubtotal + (isGiftWrapped ? 149 : 0) - getCouponDiscount());
   };
 
   const getTotalItems = () => {
@@ -1135,7 +1239,56 @@ export default function Cart() {
                   )}
                 </div>
 
+                {/* Promotional Offers & Coupons */}
+                <div className="border-t border-border pt-4 pb-2 space-y-3">
+                  <h4 className="font-semibold text-xs sm:text-sm text-foreground text-left flex items-center gap-1">🏷️ Available Coupons</h4>
+                  <div className="flex flex-col gap-2">
+                    {coupons.map((coupon) => {
+                      const isSelected = selectedCoupon === coupon.code;
+                      const isDisabled = coupon.code === "WEDDING20" && itemsSubtotal < 4999;
+                      return (
+                        <div 
+                          key={coupon.code}
+                          onClick={() => !isDisabled && handleSelectCoupon(coupon.code)}
+                          className={`flex flex-col items-start border rounded-xl p-3 cursor-pointer transition-all duration-200 ${
+                            isSelected 
+                              ? 'border-amber-600 bg-amber-50/50 shadow-sm' 
+                              : isDisabled
+                                ? 'border-dashed border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed'
+                                : 'border-slate-200 hover:border-amber-500/50 hover:bg-amber-500/5'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center w-full">
+                            <span className={`font-bold text-xs px-2 py-0.5 rounded uppercase tracking-wider ${
+                              isSelected ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-800'
+                            }`}>
+                              {coupon.code}
+                            </span>
+                            {isSelected && <span className="text-xs text-amber-600 font-bold">Applied</span>}
+                          </div>
+                          <span className="font-semibold text-[11px] mt-1 text-gray-900">{coupon.label}</span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5 text-left">{coupon.description}</span>
+                          {coupon.code === "WEDDING20" && isDisabled && (
+                            <span className="text-[9px] text-red-500 font-semibold mt-1">
+                              Add ₹{(4999 - itemsSubtotal).toLocaleString()} more to unlock
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {couponError && (
+                    <p className="text-[10px] text-red-500 font-semibold text-left">{couponError}</p>
+                  )}
+                </div>
+
                 <div className="border-t border-border pt-3 sm:pt-4">
+                  {selectedCoupon && getCouponDiscount() > 0 && (
+                    <div className="flex justify-between text-xs sm:text-sm text-green-600 font-semibold mb-2">
+                      <span>🏷️ Discount ({selectedCoupon})</span>
+                      <span>-₹{getCouponDiscount().toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-base sm:text-lg md:text-xl font-bold">
                     <span>Total</span>
                     <span className="text-primary">₹{getTotalPrice().toLocaleString()}</span>
@@ -1183,6 +1336,8 @@ export default function Cart() {
         razorpayLoaded={razorpayLoaded}
         isGiftWrapped={isGiftWrapped}
         giftMessage={giftMessage}
+        discountAmount={getCouponDiscount()}
+        couponCode={selectedCoupon || undefined}
       />
     </div>
   );

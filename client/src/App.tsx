@@ -76,6 +76,19 @@ function App() {
   const isFirstMount = useRef(true);
   const isRestoring = useRef(false);
 
+  // Capture referral ID from URL query params and store it in localStorage and a cookie
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const refId = params.get('ref') || params.get('affiliate');
+      if (refId) {
+        localStorage.setItem('swissgain_referral_id', refId);
+        document.cookie = `swissgain_referral_id=${refId}; path=/; max-age=2592000`; // 30 days
+        console.log('Stored referral ID:', refId);
+      }
+    }
+  }, [location]);
+
   // 1. Scroll listener to record scroll positions
   useEffect(() => {
     const handleScroll = () => {

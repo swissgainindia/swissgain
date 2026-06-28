@@ -8,9 +8,17 @@ export interface IOrderItem {
   price: number;
 }
 
+export interface IGuestContact {
+  name: string;
+  email: string;
+  phone: string;
+}
+
 export interface IOrder extends Document {
   orderNumber: string;
   userId?: string;
+  affiliateId?: string;
+  guestContact?: IGuestContact;
   customerName: string;
   customerEmail: string;
   customerPhone?: string;
@@ -37,6 +45,12 @@ export interface IOrder extends Document {
 const OrderSchema: Schema = new Schema({
   orderNumber: { type: String, required: true, unique: true },
   userId: { type: String },
+  affiliateId: { type: String },
+  guestContact: {
+    name: { type: String },
+    email: { type: String },
+    phone: { type: String }
+  },
   customerName: { type: String, required: true },
   customerEmail: { type: String, required: true },
   customerPhone: { type: String },

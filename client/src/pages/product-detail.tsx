@@ -171,7 +171,7 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
     const ordersRef = ref(firebaseDatabase, 'orders');
     const newOrderRef = push(ordersRef);
     const orderId = newOrderRef.key!;
-   
+    
     const orderWithId = {
       ...orderData,
       id: orderId,
@@ -180,8 +180,51 @@ const saveOrderToFirebase = async (orderData: OrderData): Promise<string> => {
       commissionProcessed: false,
       creditedUplines: {}
     };
-   
+    
     await set(newOrderRef, orderWithId);
+
+    // Save to Mongoose/MongoDB backend API as well
+    try {
+      await axios.post('/api/orders', {
+        orderNumber: orderWithId.uniqueOrderId,
+        userId: orderData.customerId?.startsWith('cust_') || orderData.customerId?.startsWith('purchase_') || orderData.customerId?.startsWith('guest_') ? undefined : orderData.customerId,
+        customerName: orderData.customerInfo.name,
+        customerEmail: orderData.customerInfo.email,
+        customerPhone: orderData.customerInfo.phone,
+        items: [{
+          productId: orderData.productId,
+          productName: orderData.productName,
+          productImage: (orderData.images && orderData.images[0]) || '',
+          quantity: orderData.quantity,
+          price: orderData.price
+        }],
+        subtotal: orderData.price * orderData.quantity,
+        shipping: 0,
+        tax: 0,
+        total: orderData.totalAmount,
+        status: 'pending',
+        shippingAddress: {
+          street: orderData.customerInfo.address,
+          city: orderData.customerInfo.city,
+          state: orderData.customerInfo.state,
+          zipCode: orderData.customerInfo.pincode,
+          country: 'India'
+        },
+        paymentMethod: 'razorpay',
+        paymentStatus: 'paid',
+        isGiftWrapped: false,
+        giftMessage: '',
+        affiliateId: orderData.affiliateId || undefined,
+        guestContact: !orderData.customerId || orderData.customerId.startsWith('cust_') || orderData.customerId.startsWith('purchase_') || orderData.customerId.startsWith('guest_') ? {
+          name: orderData.customerInfo.name,
+          email: orderData.customerInfo.email,
+          phone: orderData.customerInfo.phone
+        } : undefined
+      });
+    } catch (apiErr) {
+      console.error('Failed to save order to backend API:', apiErr);
+    }
+
     return orderId;
   } catch (error) {
     console.error('Error saving order:', error);
@@ -788,12 +831,17 @@ export default function ProductDetail() {
   const [, params] = useRoute('/product/:id');
   const productId = params?.id;
   
-  const getAffiliateIdFromUrl = () => {
+  const getPersistedAffiliateId = () => {
     if (typeof window === 'undefined') return undefined;
-    const params = new URLSearchParams(window.location.search);
-    return params.get('ref') || params.get('affiliate') || undefined;
+    const urlParams = new URLSearchParams(window.location.search);
+    const refFromUrl = urlParams.get('ref') || urlParams.get('affiliate');
+    if (refFromUrl) return refFromUrl;
+    const refFromLocal = localStorage.getItem('swissgain_referral_id');
+    if (refFromLocal) return refFromLocal;
+    const m = document.cookie.match(/(^| )swissgain_referral_id=([^;]+)/);
+    return m ? m[2] : undefined;
   };
-  const affiliateId = getAffiliateIdFromUrl();
+  const affiliateId = getPersistedAffiliateId();
   const uid = getCookie('swissgain_uid') || undefined;
   const customerId = uid || getOrCreateCustomerId();
   
@@ -1005,15 +1053,6 @@ export default function ProductDetail() {
   };
 
   const handleBuyNow = () => {
-    if (!isLoggedIn) {
-      toast({
-        title: 'Login Required',
-        description: 'Please login to continue checkout',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     handleAddToCart();
     setIsCheckoutOpen(true);
   };
