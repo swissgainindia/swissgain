@@ -10,6 +10,7 @@ import Product from "./models/Product";
 import Category from "./models/Category";
 import Order from "./models/Order";
 import Reel from "./models/Reel";
+import { cities, getCitySlug } from "./utils/cities";
 
 // Cloudinary Configuration (Yahan apni actual keys daalein ya .env use karein)
 cloudinary.config({
@@ -82,6 +83,15 @@ export async function registerRoutes(app: Express) {
   router.get("/products", async (_req, res) => {
     const products = await Product.find().sort({ sortOrder: 1, createdAt: -1 });
     res.json(products);
+  });
+  router.get("/products/slug/:slug", async (req, res) => {
+    try {
+      const product = await Product.findOne({ slug: req.params.slug });
+      if (!product) return res.status(404).json({ message: "Product not found" });
+      res.json(product);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch product" });
+    }
   });
   router.get("/products/:id", async (req, res) => {
     const product = await Product.findById(req.params.id);
@@ -298,6 +308,23 @@ export async function registerRoutes(app: Express) {
         xml += `    <changefreq>weekly</changefreq>\n`;
         xml += `    <priority>0.8</priority>\n`;
         xml += `  </url>\n`;
+      });
+
+      // 4. Add programmatic SEO landing pages (Product x City)
+      products.forEach((product) => {
+        const prodLastMod = (product as any).updatedAt
+          ? new Date((product as any).updatedAt).toISOString().split("T")[0]
+          : lastModToday;
+        
+        cities.forEach((city) => {
+          const citySlug = getCitySlug(city);
+          xml += `  <url>\n`;
+          xml += `    <loc>${baseUrl}/buy/${product.slug}-in-${citySlug}</loc>\n`;
+          xml += `    <lastmod>${prodLastMod}</lastmod>\n`;
+          xml += `    <changefreq>weekly</changefreq>\n`;
+          xml += `    <priority>0.7</priority>\n`;
+          xml += `  </url>\n`;
+        });
       });
 
       xml += `</urlset>`;

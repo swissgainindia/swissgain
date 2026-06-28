@@ -33,6 +33,7 @@ import ThankYouPage from "./pages/thankyou";
 import Order from "./pages/Order";
 import Reels from "@/pages/reels";
 import Warranty from "@/pages/warranty";
+import SeoLanding from "@/pages/seo-landing";
 
 function Router() {
   return (
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/products" component={Products} />
       <Route path="/product/:id" component={ProductDetail} />
+      <Route path="/buy/:productSlug-in-:citySlug" component={SeoLanding} />
       
       <Route path="/affiliate" component={Affiliate} />
        <Route path="/thank-you" component={ThankYouPage} />
