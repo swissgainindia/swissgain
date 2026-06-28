@@ -252,6 +252,21 @@ export async function registerRoutes(app: Express) {
 
   // DYNAMIC SITEMAP XML ROUTE
   app.get("/sitemap.xml", async (req: Request, res: Response) => {
+    // Standard XML escaping helper to prevent parsing errors like xmlParseEntityRef
+    const escapeXml = (unsafeString: string): string => {
+      if (!unsafeString) return '';
+      return unsafeString.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+    };
+
     try {
       const baseUrl = `${req.protocol}://${req.get("host")}` || "https://swissgainindia.com";
       const products = await Product.find().sort({ updatedAt: -1 });
@@ -277,7 +292,7 @@ export async function registerRoutes(app: Express) {
       // 1. Add static pages
       staticPages.forEach((page) => {
         xml += `  <url>\n`;
-        xml += `    <loc>${baseUrl}${page.loc}</loc>\n`;
+        xml += `    <loc>${escapeXml(`${baseUrl}${page.loc}`)}</loc>\n`;
         xml += `    <lastmod>${lastModToday}</lastmod>\n`;
         xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
         xml += `    <priority>${page.priority}</priority>\n`;
@@ -290,7 +305,7 @@ export async function registerRoutes(app: Express) {
           ? new Date((category as any).updatedAt).toISOString().split("T")[0]
           : lastModToday;
         xml += `  <url>\n`;
-        xml += `    <loc>${baseUrl}/products?category=${category.slug}</loc>\n`;
+        xml += `    <loc>${escapeXml(`${baseUrl}/products?category=${category.slug}`)}</loc>\n`;
         xml += `    <lastmod>${catLastMod}</lastmod>\n`;
         xml += `    <changefreq>weekly</changefreq>\n`;
         xml += `    <priority>0.8</priority>\n`;
@@ -303,7 +318,7 @@ export async function registerRoutes(app: Express) {
           ? new Date((product as any).updatedAt).toISOString().split("T")[0]
           : lastModToday;
         xml += `  <url>\n`;
-        xml += `    <loc>${baseUrl}/product/${product._id}</loc>\n`;
+        xml += `    <loc>${escapeXml(`${baseUrl}/product/${product._id}`)}</loc>\n`;
         xml += `    <lastmod>${prodLastMod}</lastmod>\n`;
         xml += `    <changefreq>weekly</changefreq>\n`;
         xml += `    <priority>0.8</priority>\n`;
@@ -319,7 +334,7 @@ export async function registerRoutes(app: Express) {
         cities.forEach((city) => {
           const citySlug = getCitySlug(city);
           xml += `  <url>\n`;
-          xml += `    <loc>${baseUrl}/buy/${product.slug}-in-${citySlug}</loc>\n`;
+          xml += `    <loc>${escapeXml(`${baseUrl}/buy/${product.slug}-in-${citySlug}`)}</loc>\n`;
           xml += `    <lastmod>${prodLastMod}</lastmod>\n`;
           xml += `    <changefreq>weekly</changefreq>\n`;
           xml += `    <priority>0.7</priority>\n`;
