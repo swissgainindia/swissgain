@@ -59,6 +59,79 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Convert guest user to registered user post-purchase
+  router.post("/users/convert-guest", async (req: Request, res: Response) => {
+    try {
+      const { orderId, password } = req.body;
+      if (!orderId || !password) {
+        return res.status(400).json({ message: "Order ID and password are required" });
+      }
+
+      // Find the order by orderId
+      let order = null;
+      if (mongoose.Types.ObjectId.isValid(orderId)) {
+        order = await Order.findById(orderId);
+      }
+      if (!order) {
+        order = await Order.findOne({ orderNumber: orderId });
+      }
+
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Extract guest contact info
+      const guestName = order.guestContact?.name || order.customerName;
+      const guestEmail = order.guestContact?.email || order.customerEmail;
+
+      if (!guestEmail) {
+        return res.status(400).json({ message: "Order does not contain guest email" });
+      }
+
+      // Check if user already exists
+      let user = await User.findOne({ email: guestEmail });
+      if (user) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+
+      // Create new User document
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Generate a unique username from email
+      const emailPrefix = guestEmail.split("@")[0];
+      let username = emailPrefix.replace(/[^a-zA-Z0-9]/g, "");
+      let existingUsername = await User.findOne({ username });
+      if (existingUsername) {
+        username = `${username}${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      user = new User({
+        username,
+        email: guestEmail.toLowerCase().trim(),
+        password: hashedPassword,
+        role: "customer",
+        status: "active"
+      });
+      await user.save();
+
+      // Update Order document
+      order.userId = user._id.toString();
+      await order.save();
+
+      // Generate JWT Token
+      const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+
+      res.status(200).json({
+        message: "Guest converted successfully",
+        token,
+        user: { id: user._id, username: user.username, email: user.email, role: user.role }
+      });
+    } catch (error: any) {
+      console.error("Convert guest error:", error);
+      res.status(500).json({ message: error.message || "Failed to convert guest to user" });
+    }
+  });
+
   // User login (optional)
   router.post("/auth/login", async (req: Request, res: Response) => {
     try {

@@ -34,6 +34,7 @@ import Order from "./pages/Order";
 import Reels from "@/pages/reels";
 import Warranty from "@/pages/warranty";
 import SeoLanding from "@/pages/seo-landing";
+import OrderSuccess from "@/pages/order-success";
 
 function Router() {
   return (
@@ -59,6 +60,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/reels" component={Reels} />
       <Route path="/warranty" component={Warranty} />
+      <Route path="/order-success" component={OrderSuccess} />
       {/* Direct admin panel route */}
       <Route path="/admin-panel" component={AdminPanel} />
       
