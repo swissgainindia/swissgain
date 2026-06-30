@@ -606,7 +606,7 @@ export default function AdminOrders() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           {order.images && order.images.length > 0 && (
-                            <img
+                            <img loading="lazy"
                               src={order.images[0]}
                               alt={order.productName}
                               className="w-10 h-10 object-cover rounded"
@@ -739,7 +739,7 @@ export default function AdminOrders() {
                 <CardContent>
                   <div className="flex items-center space-x-4">
                     {selectedOrder.images && selectedOrder.images.length > 0 && (
-                      <img
+                      <img loading="lazy"
                         src={selectedOrder.images[0]}
                         alt={selectedOrder.productName}
                         className="w-20 h-20 object-cover rounded"

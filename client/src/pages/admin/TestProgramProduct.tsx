@@ -276,7 +276,7 @@ export default function AdminProducts() {
                 <TableRow key={product._id}>
                   <TableCell>
                     <div className="flex items-center space-x-3">
-                      <img
+                      <img loading="lazy"
                         src={product.image}
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded"

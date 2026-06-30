@@ -281,7 +281,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         <div className="space-y-2">
           <Label htmlFor="image">Main Image *</Label>
           <div className="space-y-2">
-            {formData.image && <img src={formData.image} alt="Preview" className="w-32 h-32 object-cover rounded border" />}
+            {formData.image && <img loading="lazy" src={formData.image} alt="Preview" className="w-32 h-32 object-cover rounded border" />}
             <Input id="image" type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setImageFile(file); }} />
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
               <div className="flex flex-wrap gap-2 mb-2">
                 {formData.images.split(",").filter(Boolean).map((url: string, idx: number) => (
                   <div key={idx} className="relative group">
-                    <img src={url.trim()} alt={`Existing preview ${idx + 1}`} className="w-16 h-16 object-cover rounded border" />
+                    <img loading="lazy" src={url.trim()} alt={`Existing preview ${idx + 1}`} className="w-16 h-16 object-cover rounded border" />
                     <Button type="button" variant="ghost" size="sm" className="absolute -top-1 -right-1 bg-background rounded-full p-0 w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeExistingImage(url.trim())}><X className="h-3 w-3 text-destructive" /></Button>
                   </div>
                 ))}
@@ -304,7 +304,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
               <div className="flex flex-wrap gap-2">
                 {additionalImageFiles.map((file, idx) => (
                   <div key={idx} className="relative group">
-                    <img src={URL.createObjectURL(file)} alt={`New preview ${idx + 1}`} className="w-16 h-16 object-cover rounded border" />
+                    <img loading="lazy" src={URL.createObjectURL(file)} alt={`New preview ${idx + 1}`} className="w-16 h-16 object-cover rounded border" />
                     <Button type="button" variant="ghost" size="sm" className="absolute -top-1 -right-1 bg-background rounded-full p-0 w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeNewImage(idx)}><X className="h-3 w-3 text-destructive" /></Button>
                   </div>
                 ))}

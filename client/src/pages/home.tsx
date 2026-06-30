@@ -74,7 +74,7 @@ export default function Home() {
               <Link key={category.name} href={category.href}>
                 <div className="group cursor-pointer text-center">
                   <div className="relative overflow-hidden rounded-full w-24 h-24 mx-auto mb-4 shadow-lg group-hover:shadow-xl transition-shadow">
-                    <img 
+                    <img loading="lazy" 
                       src={category.image} 
                       alt={category.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"

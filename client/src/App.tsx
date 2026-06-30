@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, Suspense, lazy } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { HelmetProvider } from "react-helmet-async";
 import { queryClient } from "./lib/queryClient";
@@ -10,62 +10,65 @@ import Footer from "@/components/layout/footer";
 import WelcomeCouponModal from "@/components/layout/welcome-coupon-modal";
 import FomoTicker from "@/components/layout/fomo-ticker";
 import AiStylistChatbot from "@/components/layout/ai-stylist-chatbot";
-import Home from "@/pages/home";
-import Products from "@/pages/products";
 
-import ProductDetail from "@/pages/product-detail";
-import Affiliate from "@/pages/affiliate";
-import ReferEarn from "@/pages/refer-earn";
-import Cart from "@/pages/cart";
-import Contact from "@/pages/Contact";
-import Dashboard from "@/pages/dashboard";
-import NotFound from "@/pages/not-found";
-// Remove AdminLogin import since we bypass login
-import AdminPanel from "@/pages/admin-panel";
-import AffiliateProduct from "./pages/admin/TestProgramProduct";
-// import TermsAndConditions from "./pages/termsandconditions";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import RefundAndCancellation from "./pages/RefundAndCancellation";
-import TermsAndConditions from "./pages/TermsAndConditions";
-import AffiliateSales from "./pages/AffilliateSales";
-import TestReferralEarnings from "./pages/admin/TestReferralEarnings";
-import ThankYouPage from "./pages/thankyou";
-import Order from "./pages/Order";
-import Reels from "@/pages/reels";
-import Warranty from "@/pages/warranty";
-import SeoLanding from "@/pages/seo-landing";
-import OrderSuccess from "@/pages/order-success";
+const Home = lazy(() => import("@/pages/home"));
+const Products = lazy(() => import("@/pages/products"));
+const ProductDetail = lazy(() => import("@/pages/product-detail"));
+const Affiliate = lazy(() => import("@/pages/affiliate"));
+const ReferEarn = lazy(() => import("@/pages/refer-earn"));
+const Cart = lazy(() => import("@/pages/cart"));
+const Contact = lazy(() => import("@/pages/Contact"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AdminPanel = lazy(() => import("@/pages/admin-panel"));
+const AffiliateProduct = lazy(() => import("./pages/admin/TestProgramProduct"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const RefundAndCancellation = lazy(() => import("./pages/RefundAndCancellation"));
+const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
+const AffiliateSales = lazy(() => import("./pages/AffilliateSales"));
+const TestReferralEarnings = lazy(() => import("./pages/admin/TestReferralEarnings"));
+const ThankYouPage = lazy(() => import("./pages/thankyou"));
+const Order = lazy(() => import("./pages/Order"));
+const Reels = lazy(() => import("@/pages/reels"));
+const Warranty = lazy(() => import("@/pages/warranty"));
+const SeoLanding = lazy(() => import("@/pages/seo-landing"));
+const OrderSuccess = lazy(() => import("@/pages/order-success"));
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/testreferralearnings" component={TestReferralEarnings} />
-      <Route path="/affiliatesales" component={AffiliateSales} />
-      <Route path="/refundandcancellation" component={RefundAndCancellation} />
-      <Route path="/termsandconditions" component={TermsAndConditions} />
-      <Route path="/privacy-policy" component={PrivacyPolicy} />
-      {/* <Route path="/termsandconditions" component={TermsAndConditions} /> */}
-      <Route path="/AffiliateProduct" component={AffiliateProduct} />
-      <Route path="/" component={Home} />
-      <Route path="/products" component={Products} />
-      <Route path="/product/:id" component={ProductDetail} />
-      <Route path="/buy/:productSlug-in-:citySlug" component={SeoLanding} />
-      
-      <Route path="/affiliate" component={Affiliate} />
-       <Route path="/thank-you" component={ThankYouPage} />
-       <Route path="/order" component={Order} />
-      <Route path="/refer-earn" component={ReferEarn} />
-      <Route path="/cart" component={Cart} />
-      <Route path="/contact" component={Contact} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/reels" component={Reels} />
-      <Route path="/warranty" component={Warranty} />
-      <Route path="/order-success" component={OrderSuccess} />
-      {/* Direct admin panel route */}
-      <Route path="/admin-panel" component={AdminPanel} />
-      
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <Switch>
+        <Route path="/testreferralearnings" component={TestReferralEarnings} />
+        <Route path="/affiliatesales" component={AffiliateSales} />
+        <Route path="/refundandcancellation" component={RefundAndCancellation} />
+        <Route path="/termsandconditions" component={TermsAndConditions} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/AffiliateProduct" component={AffiliateProduct} />
+        <Route path="/" component={Home} />
+        <Route path="/products" component={Products} />
+        <Route path="/product/:id" component={ProductDetail} />
+        <Route path="/buy/:productSlug-in-:citySlug" component={SeoLanding} />
+        
+        <Route path="/affiliate" component={Affiliate} />
+        <Route path="/thank-you" component={ThankYouPage} />
+        <Route path="/order" component={Order} />
+        <Route path="/refer-earn" component={ReferEarn} />
+        <Route path="/cart" component={Cart} />
+        <Route path="/contact" component={Contact} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/reels" component={Reels} />
+        <Route path="/warranty" component={Warranty} />
+        <Route path="/order-success" component={OrderSuccess} />
+        {/* Direct admin panel route */}
+        <Route path="/admin-panel" component={AdminPanel} />
+        
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
 
     
   );

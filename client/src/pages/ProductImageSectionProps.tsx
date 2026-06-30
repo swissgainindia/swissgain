@@ -18,7 +18,7 @@ export default function ProductImageSection({
   return (
     <div className="space-y-4">
       <div className="relative">
-        <img
+        <img loading="lazy"
           src={images[selectedIndex]}
           alt={`${name} main view`}
           className="rounded-xl shadow-lg w-full h-96 object-cover"
@@ -33,7 +33,7 @@ export default function ProductImageSection({
       {images.length > 1 && (
         <div className="grid grid-cols-4 gap-4">
           {images.map((img, index) => (
-            <img
+            <img loading="lazy"
               key={index}
               src={img}
               alt={`${name} view ${index + 1}`}

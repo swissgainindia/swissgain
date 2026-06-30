@@ -36,7 +36,7 @@ export default function Footer() {
   return (
     <footer className="bg-[#300708] text-background mx-2 mb-2 rounded-2xl">
       <div className='flex justify-center'>
-        <img src="https://stores.tanishq.co.in/static/media/top-bottom-border-curve.3ba34b4d22b39e10b926.webp" alt="" />
+        <img loading="lazy" src="https://stores.tanishq.co.in/static/media/top-bottom-border-curve.3ba34b4d22b39e10b926.webp" alt="" />
       </div>
       <div className='py-16'>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -44,7 +44,7 @@ export default function Footer() {
             <div className="space-y-4">
               {/* Logo */}
               <div className="flex justifiy-start items-center space-x-0">
-                <img
+                <img loading="lazy"
                   src={Logo}
                   alt="LuxeChains Logo"
                   width={120}
@@ -201,7 +201,7 @@ export default function Footer() {
       </div>
 
       <div className="flex justify-center">
-        <img
+        <img loading="lazy"
           src="https://stores.tanishq.co.in/static/media/top-bottom-border-curve.3ba34b4d22b39e10b926.webp"
           alt=""
           className="rotate-180 w-36"

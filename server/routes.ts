@@ -157,10 +157,29 @@ export async function registerRoutes(app: Express) {
     const products = await Product.find().sort({ sortOrder: 1, createdAt: -1 });
     res.json(products);
   });
+  const seoProductCache = new Map<string, { data: any; timestamp: number }>();
+  const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
   router.get("/products/slug/:slug", async (req, res) => {
     try {
-      const product = await Product.findOne({ slug: req.params.slug });
+      const slug = req.params.slug;
+      const now = Date.now();
+
+      // Check cache first (0ms latency for Googlebot)
+      if (seoProductCache.has(slug)) {
+        const cached = seoProductCache.get(slug)!;
+        if (now - cached.timestamp < CACHE_TTL) {
+          return res.json(cached.data);
+        } else {
+          seoProductCache.delete(slug); // Clear expired cache
+        }
+      }
+
+      const product = await Product.findOne({ slug });
       if (!product) return res.status(404).json({ message: "Product not found" });
+
+      // Save to cache
+      seoProductCache.set(slug, { data: product, timestamp: now });
       res.json(product);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch product" });

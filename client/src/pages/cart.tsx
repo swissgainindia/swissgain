@@ -757,7 +757,7 @@ function CartCheckoutModal({
             <div className="space-y-2 sm:space-y-3 mb-3 sm:mb-4 max-h-40 sm:max-h-52 overflow-y-auto">
               {cartItems.map((item) => (
                 <div key={item.id} className="flex items-start sm:items-center space-x-2 sm:space-x-3">
-                  <img 
+                  <img loading="lazy" 
                     src={item.images?.[0] || item.image || '/placeholder.png'} 
                     alt={item.name} 
                     className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded flex-shrink-0" 
@@ -1107,7 +1107,7 @@ export default function Cart() {
                 <CardContent className="p-3 sm:p-4 md:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                     {/* Product Image */}
-                    <img
+                    <img loading="lazy"
                       src={item.images?.[0] || item.image}
                       alt={item.name}
                       className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover self-center sm:self-start"

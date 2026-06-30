@@ -881,7 +881,7 @@ export default function AdminUsers() {
                           <TableCell>
                             <div className="flex items-center space-x-3">
                               {sale.images && sale.images.length > 0 && (
-                                <img
+                                <img loading="lazy"
                                   src={sale.images[0]}
                                   alt={sale.productName}
                                   className="w-10 h-10 object-cover rounded"
@@ -1134,7 +1134,7 @@ export default function AdminUsers() {
                         <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div className="flex items-center space-x-3">
                             {sale.images && sale.images.length > 0 && (
-                              <img
+                              <img loading="lazy"
                                 src={sale.images[0]}
                                 alt={sale.productName}
                                 className="w-12 h-12 object-cover rounded"

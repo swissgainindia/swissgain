@@ -428,7 +428,7 @@ export default function ReelsPage() {
                     {isAdminUpload ? (
                       <>
                         <div className="h-9 w-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shadow-md p-1 overflow-hidden">
-                          <img src={BrandLogo} alt="SwissGain Logo" className="h-full w-full object-contain" />
+                          <img loading="lazy" src={BrandLogo} alt="SwissGain Logo" className="h-full w-full object-contain" />
                         </div>
                         <div>
                           <p className="font-bold text-sm text-white drop-shadow-md">
@@ -509,7 +509,7 @@ export default function ReelsPage() {
                   <div className="bg-black/60 backdrop-blur-xl border border-white/15 rounded-2xl p-3 flex items-center justify-between shadow-2xl transition-all duration-300 hover:border-amber-500/30">
                     <Link href={`/product/${reel.productId._id}`} onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-3 text-left">
-                        <img 
+                        <img loading="lazy" 
                           src={reel.productId.image} 
                           alt={reel.productId.name} 
                           className="w-12 h-12 object-cover rounded-lg border border-white/10 flex-shrink-0"

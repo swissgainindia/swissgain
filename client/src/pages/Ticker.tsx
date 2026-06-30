@@ -15,35 +15,35 @@ const Ticker: React.FC = () => {
       <div className="ticker">
         <div className="ticker-content" ref={tickerRef}>
           <span>
-            <img
+            <img loading="lazy"
               src="https://brown-wolf-538857.hostingersite.com/wp-content/uploads/2025/06/banner.png"
               alt="Gold Necklaces"
             />
             GOLD NECKLACES
           </span>
           <span>
-            <img
+            <img loading="lazy"
               src="https://brown-wolf-538857.hostingersite.com/wp-content/uploads/2025/06/banner-1.png"
               alt="Diamond Rings"
             />
             DIAMOND RINGS
           </span>
           <span>
-            <img
+            <img loading="lazy"
               src="https://brown-wolf-538857.hostingersite.com/wp-content/uploads/2025/06/banner-2.png"
               alt="Silver Bracelets"
             />
             SILVER BRACELETS
           </span>
           <span>
-            <img
+            <img loading="lazy"
               src="https://brown-wolf-538857.hostingersite.com/wp-content/uploads/2025/06/banner-3-scaled.png"
               alt="Pearl Earrings"
             />
             PEARL EARRINGS
           </span>
           <span>
-            <img
+            <img loading="lazy"
               src="https://brown-wolf-538857.hostingersite.com/wp-content/uploads/2025/06/banner-4.png"
               alt="Luxury Pendants"
             />

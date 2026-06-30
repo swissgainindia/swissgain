@@ -348,7 +348,7 @@ const Order = () => {
                       href={`/product/${order.productId}`}
                       className="self-center sm:self-start"
                     >
-                      <img
+                      <img loading="lazy"
                         src={order.images?.[0] || '/placeholder.svg'}
                         alt={order.productName}
                         className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"

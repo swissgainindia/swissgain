@@ -318,7 +318,7 @@ export default function AdminReels() {
                   <TableRow key={reel?._id} className="hover:bg-muted/10 transition-colors">
                     <TableCell className="font-semibold">
                       <div className="flex items-center gap-2">
-                        <img 
+                        <img loading="lazy" 
                           src={reel?.productId?.image || '/placeholder.png'} 
                           alt="" 
                           className="w-10 h-10 object-cover rounded-lg border border-border flex-shrink-0"

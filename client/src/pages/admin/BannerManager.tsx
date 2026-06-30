@@ -193,7 +193,7 @@ const BannerManager = () => {
         <div>
           <p className="text-sm font-semibold mb-1">Current Banner ({savedBanner.type}):</p>
           {savedBanner.type === "image" && savedBanner.image && (
-            <img
+            <img loading="lazy"
               src={savedBanner.image}
               className="w-full h-44 object-cover border rounded"
               alt="Current banner"
@@ -201,7 +201,7 @@ const BannerManager = () => {
           )}
           {savedBanner.type === "youtube" && savedBanner.thumbnail && (
             <div>
-              <img
+              <img loading="lazy"
                 src={savedBanner.thumbnail}
                 className="w-full h-44 object-cover border rounded"
                 alt="YouTube thumbnail"
@@ -268,7 +268,7 @@ const BannerManager = () => {
       {preview && (
         <div>
           <p className="text-sm font-semibold mb-1">Preview:</p>
-          <img
+          <img loading="lazy"
             src={preview}
             className="w-full h-44 object-cover border rounded"
             alt="Preview"

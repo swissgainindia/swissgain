@@ -9,7 +9,7 @@ const NewArrivals: React.FC = () => {
     <section className="bg-[#c4b8ab] pb-20">
       {/* Full-width Top Ring Image with Text Overlay */}
       <div className="w-full h-[400px] relative">
-        <img
+        <img loading="lazy"
           src={Arrivals1}
           alt="Rings"
           className="object-cover w-full h-full absolute inset-0"

@@ -766,7 +766,7 @@ export default function AffiliateSales() {
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             {sale.images.length > 0 && (
-                              <img
+                              <img loading="lazy"
                                 src={sale.images[0]}
                                 alt={sale.productName}
                                 className="w-10 h-10 object-cover rounded"

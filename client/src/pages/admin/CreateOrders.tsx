@@ -388,7 +388,7 @@ export default function CreateOrders() {
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-center">
                     <div className="flex gap-4">
-                      <img src={selectedProduct.images[0]} alt="" className="w-24 h-24 rounded-lg object-cover" />
+                      <img loading="lazy" src={selectedProduct.images[0]} alt="" className="w-24 h-24 rounded-lg object-cover" />
                       <div>
                         <h4 className="font-semibold text-lg">{selectedProduct.name}</h4>
                         <p className="text-muted-foreground">₹{selectedProduct.price.toLocaleString()} × {quantity}</p>

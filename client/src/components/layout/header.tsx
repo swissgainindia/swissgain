@@ -221,7 +221,7 @@ export default function NecklaceEcommerceHeader() {
             
             {/* Logo Section - DYNAMIC LOGO & SIZE */}
             <div className="flex items-center shrink-0">
-              <img 
+              <img loading="lazy" 
                 src={currentLogo} 
                 alt="Swissgain" 
                 width={logoSize} 
@@ -389,7 +389,7 @@ export default function NecklaceEcommerceHeader() {
           <div className="relative flex flex-col w-4/5 max-w-sm h-full bg-gradient-to-b from-[#300708] to-amber-950 text-white p-6 shadow-2xl z-10 transition-transform duration-300 transform translate-x-0 border-r border-amber-800/20">
             {/* Close button */}
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-amber-800/30">
-              <img 
+              <img loading="lazy" 
                 src={WhiteLogo} 
                 alt="Swissgain" 
                 width={100}

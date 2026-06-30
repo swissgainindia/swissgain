@@ -584,7 +584,7 @@ export default function CartCheckoutModal({
             <div className="space-y-3 mb-3">
               {cartItems.map((item) => (
                 <div key={item.id} className="flex items-center space-x-3">
-                  <img 
+                  <img loading="lazy" 
                     src={item.images?.[0] || item.image} 
                     alt={item.name} 
                     className="w-12 h-12 object-cover rounded" 

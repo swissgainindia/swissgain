@@ -1103,7 +1103,7 @@ export default function ProductDetail() {
           {/* Left Column: Images */}
           <div className="space-y-4">
             <div className="relative overflow-hidden rounded-xl shadow-lg">
-              <img
+              <img loading="lazy"
                 src={product.images[selectedImageIndex] || FALLBACK_IMAGE}
                 alt={product.name}
                 className="w-full h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"
@@ -1125,7 +1125,7 @@ export default function ProductDetail() {
             {product.images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {product.images.map((img: string, i: number) => (
-                  <img
+                  <img loading="lazy"
                     key={i}
                     src={img || FALLBACK_IMAGE}
                     alt={`Thumbnail ${i + 1}`}

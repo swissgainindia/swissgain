@@ -808,7 +808,7 @@ function CheckoutModal({ isOpen, onClose, product, quantity, affiliateId, custom
           <div className="bg-muted p-4 rounded-lg">
             <h3 className="font-semibold mb-3">Order Summary</h3>
             <div className="flex items-center space-x-3 mb-3">
-              <img src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" />
+              <img loading="lazy" src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" />
               <div className="flex-1">
                 <p className="font-medium">{product.name}</p>
                 <p className="text-sm text-muted-foreground">Quantity: {quantity}</p>
@@ -1080,7 +1080,7 @@ export default function ProductDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start mb-16">
           <div className="space-y-4">
             <div className="relative">
-              <img 
+              <img loading="lazy" 
                 src={product.images[selectedImageIndex] || FALLBACK_IMAGE} 
                 alt={product.name} 
                 className="rounded-xl shadow-lg w-full h-96 object-cover" 
@@ -1095,7 +1095,7 @@ export default function ProductDetail() {
             {product.images.length > 1 && (
               <div className="grid grid-cols-4 gap-4">
                 {product.images.map((img: string, i: number) => (
-                  <img 
+                  <img loading="lazy" 
                     key={i} 
                     src={img} 
                     alt="" 

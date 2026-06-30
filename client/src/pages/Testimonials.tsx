@@ -149,7 +149,7 @@ const Testimonials: React.FC = () => {
         {/* Customer image */}
         <div className="relative mb-6 md:mb-0 md:mr-8 flex-shrink-0">
           <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-amber-200 shadow-lg">
-            <img
+            <img loading="lazy"
               src={testimonial.image}
               alt={testimonial.name}
               className="object-cover w-full h-full"
@@ -226,7 +226,7 @@ const Testimonials: React.FC = () => {
             >
               <div className="flex items-center mb-4">
                 <div className="w-12 h-12 rounded-full overflow-hidden mr-4 border-2 border-amber-200">
-                  <img
+                  <img loading="lazy"
                     src={testimonial.image}
                     alt={testimonial.name}
                     className="object-cover w-full h-full"
