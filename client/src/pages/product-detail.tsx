@@ -1103,7 +1103,7 @@ export default function ProductDetail() {
           {/* Left Column: Images */}
           <div className="space-y-4">
             <div className="relative overflow-hidden rounded-xl shadow-lg">
-              <img loading="lazy"
+              <img
                 src={product.images[selectedImageIndex] || FALLBACK_IMAGE}
                 alt={product.name}
                 className="w-full h-96 object-cover cursor-zoom-in transition-transform duration-300 hover:scale-110"

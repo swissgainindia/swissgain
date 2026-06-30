@@ -115,16 +115,16 @@ export async function registerRoutes(app: Express) {
       await user.save();
 
       // Update Order document
-      order.userId = user._id.toString();
+      order.userId = (user as any)._id.toString();
       await order.save();
 
       // Generate JWT Token
-      const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+      const token = jwt.sign({ userId: (user as any)._id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 
       res.status(200).json({
         message: "Guest converted successfully",
         token,
-        user: { id: user._id, username: user.username, email: user.email, role: user.role }
+        user: { id: (user as any)._id, username: user.username, email: user.email, role: user.role }
       });
     } catch (error: any) {
       console.error("Convert guest error:", error);
