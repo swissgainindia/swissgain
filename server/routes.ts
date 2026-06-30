@@ -152,6 +152,17 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // SEO ASSETS
+  router.get("/robots.txt", (req, res) => {
+    res.type("text/plain");
+    res.send(`User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://www.swissgainindia.com/sitemap.xml`);
+  });
+
   // PUBLIC PRODUCT ROUTES
   router.get("/products", async (_req, res) => {
     const products = await Product.find().sort({ sortOrder: 1, createdAt: -1 });
